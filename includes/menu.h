@@ -72,7 +72,7 @@ typedef struct {
 // Item do painel de status e seu tooltip.
 typedef struct {
   int x, y;
-  float largura, altura;
+  float largura, altura, larguratooltip;
   char texto[80];
   char tooltip[160];
   int destacado;

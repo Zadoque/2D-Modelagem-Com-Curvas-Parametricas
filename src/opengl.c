@@ -661,47 +661,51 @@ void onMouseMove(int x, int y) {
   int largura_janela = glutGet(GLUT_WINDOW_WIDTH);
   int largura_desenho = largura_janela - menu_largura;
   int change = 0;
+  int estado = 0;
+  int menu_x = x - largura_desenho;
+  int menu_y = glutGet(GLUT_WINDOW_HEIGHT) - y;
+
   if (x >= largura_desenho) {
     // Mouse no menu
-    int menu_x = x - largura_desenho;
-    int menu_y = glutGet(GLUT_WINDOW_HEIGHT) - y;
-
+    
     for (int i = 0; i < 5; i++) {
       Botoes1 *botao = &botoes.botoes1[i];
-      botao->destacado =
-          (menu_x >= botao->x && menu_x <= botao->x + botao->largura &&
-           menu_y >= botao->y && menu_y <= botao->y + botao->altura);
-      change += botao->destacado;
+      estado = (menu_x >= botao->x && menu_x <= botao->x + botao->largura && menu_y >= botao->y && menu_y <= botao->y + botao->altura);
+      change += ((botao->destacado) != estado) ? 1: 0;
+      botao->destacado = estado;
     }
     for (int i = 0; i < 2; i++) {
       Botoes2 *botao = &botoes.botoes2[i];
-      botao->destacado =
-          (menu_x >= botao->x && menu_x <= botao->x + botao->largura &&
-           menu_y >= botao->y && menu_y <= botao->y + botao->altura);
-      change += botao->destacado;
+       estado = (menu_x >= botao->x && menu_x <= botao->x + botao->largura && menu_y >= botao->y && menu_y <= botao->y + botao->altura);
+        change += ((botao->destacado) != estado) ? 1: 0;
+        botao->destacado = estado;
     }
     for (int i = 0; i < 4; i++) {
       Botoes3 *botao = &botoes.botoes3[i];
-      botao->destacado =
-          (menu_x >= botao->x && menu_x <= botao->x + botao->largura &&
-           menu_y >= botao->y && menu_y <= botao->y + botao->altura);
-      change += botao->destacado;
+      estado = (menu_x >= botao->x && menu_x <= botao->x + botao->largura && menu_y >= botao->y && menu_y <= botao->y + botao->altura);
+      change += ((botao->destacado) != estado) ? 1: 0;
+      botao->destacado = estado;
     }
     if (estado_atual.criacao_ou_selecao != MODO_CRIAR_PONTO) {
       for (int i = 0; i < 4; i++) {
         BotoesOperacoes *botao = &botoes_operacoes[i];
-        botao->destacado =
-            (menu_x >= botao->x && menu_x <= botao->x + botao->largura &&
-             menu_y >= botao->y && menu_y <= botao->y + botao->altura);
-        change += botao->destacado;
+        estado = (menu_x >= botao->x && menu_x <= botao->x + botao->largura && menu_y >= botao->y && menu_y <= botao->y + botao->altura);
+        change += ((botao->destacado) != estado) ? 1: 0;
+        botao->destacado = estado;
       }
+    }
+    for(int i = 0; i < 2; i++){
+      InfoItem* information = &info[i];
+      estado = (menu_x >= information->x && menu_x <= information->x + information->largura && menu_y >= information->y && menu_y <= information->y + information->altura);
+      change += ((information->destacado) != estado) ? 1: 0;
+      information->destacado =  estado;
     }
     if(change){ 
       //precis_recalcular_curva
       precisa_refazer_curva = 1;
       glutPostRedisplay();
     }
-  }
+  } 
 }
 
 void onMotion(int x, int y) {

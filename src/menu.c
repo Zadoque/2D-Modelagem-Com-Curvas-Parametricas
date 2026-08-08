@@ -10,6 +10,7 @@ float menu_escala_fonte = 0.1f;
 float menu_altura_fonte = 12.0f;
 float info_escala_fonte = 5.0f;
 void *menu_fonte_stroke = GLUT_STROKE_ROMAN;
+
 Botoes botoes;
 BotoesOperacoes botoes_operacoes[4];
 InfoItem info[2];
@@ -25,34 +26,36 @@ void atualizar_dimensoes_menu() {
 
     int margem = menu_largura * 0.05;
     int largura_botao = menu_largura - (2 * margem);
-    int altura_botao = altura_janela * 0.03;
-    int espacamento = altura_janela * 0.01;
+    int altura_botao = altura_janela * 0.03; // 3% da atura da janela
+    int espacamento = altura_janela * 0.01; // 1% da altura da janela
 
     menu_altura_fonte = altura_botao * 0.45f;
     menu_escala_fonte = (largura_botao * 0.09f) / 121.05f;
     info_escala_fonte = (largura_botao * 0.05f) / 121.0f;
 
     // Painel de status: canto inferior direito do menu.
-    const int painel_margem = 8;
-    const int painel_espacamento = 8;
+    const int painel_margem = margem / 2;
+    const int painel_espacamento = espacamento / 2;
     const int painel_largura = menu_largura - 2 * painel_margem;
-    const int item_altura = 24;
+    const int item_altura = altura_botao * 0.9;
     const int y_base = painel_margem;
 
     strcpy(info[0].texto, "Pontos de controle: 0");
-    strcpy(info[0].tooltip, "Quantidade de pontos que define a forma da curva.");
+    strcpy(info[0].tooltip, "Qtd de pontos de controle.");
     info[0].x = painel_margem;
     info[0].y = y_base + item_altura + painel_espacamento;
-    info[0].largura = painel_largura;
-    info[0].altura = item_altura;
+    info[0].largura = calcular_largura_texto_stroke(menu_fonte_stroke, info[0].texto, info_escala_fonte);
+    info[0].larguratooltip = calcular_largura_texto_stroke(menu_fonte_stroke, info[0].tooltip, info_escala_fonte);
+    info[0].altura =  calcular_altura_fonte_stroke(menu_escala_fonte);
+  
 
     strcpy(info[1].texto, "Nuvem de pontos: 0");
-    strcpy(info[1].tooltip, "Quantidade de pontos amostrados da curva atual.");
+    strcpy(info[1].tooltip, "Qtd de pontos da curva atual.");
     info[1].x = painel_margem;
     info[1].y = y_base;
-    info[1].largura = painel_largura;
-    info[1].altura = item_altura;
-
+    info[1].largura = calcular_largura_texto_stroke(menu_fonte_stroke, info[0].texto, info_escala_fonte);
+    info[1].larguratooltip = calcular_largura_texto_stroke(menu_fonte_stroke, info[0].tooltip, info_escala_fonte);
+    info[1].altura =  calcular_altura_fonte_stroke(menu_escala_fonte);
     // === BOTÕES DE CRIAÇÃO/SELEÇÃO (Grupo 1) ===
     int y_inicio_grupo1 = altura_janela * 0.05;
     strcpy(botoes.botoes1[0].texto, "Criar Ponto");
@@ -270,11 +273,9 @@ float calcular_altura_fonte_stroke(float escala) {
 }
 
 void recalcula_dimensoes_info(){
-  const float escala = info_escala_fonte * 0.72f;
   for (int i = 0; i < 2; i++) {
-    info[i].largura = calcular_largura_texto_stroke(menu_fonte_stroke, info[i].texto, escala);
-    info[i].altura = 24.0f;
-    info[i].x = (int)(menu_largura - 8.0f - info[i].largura);
+    info[i].largura = calcular_largura_texto_stroke(menu_fonte_stroke, info[i].texto, info_escala_fonte);
+    info[i].altura = calcular_altura_fonte_stroke(info_escala_fonte);
   }
 }
 
@@ -297,11 +298,10 @@ static void desenhar_retangulo_info(const InfoItem *item) {
 }
 
 static void desenhar_tooltip(const InfoItem *item) {
-  const float escala = info_escala_fonte * 0.55f;
   const float margem = 7.0f;
   const float altura = 28.0f;
-  const float largura_texto = calcular_largura_texto_stroke(menu_fonte_stroke, item->tooltip, escala);
-  float x = item->x - largura_texto - 2.0f * margem;
+  const float largura_texto = calcular_largura_texto_stroke(menu_fonte_stroke, item->tooltip, info_escala_fonte);
+  float x = item->x;
   float y = item->y + item->altura + 6.0f;
 
   if (x < 4.0f) x = 4.0f;
@@ -315,24 +315,24 @@ static void desenhar_tooltip(const InfoItem *item) {
   glEnd();
 
   glColor3f(1.0f, 1.0f, 1.0f);
-  desenhar_texto(x + margem, y + 7.0f, menu_fonte_stroke, item->tooltip, escala);
+  desenhar_texto(x, y + 7.0f, menu_fonte_stroke, item->tooltip, info_escala_fonte);
 }
 
 void desenhar_info(){
   atualiza_info();
   recalcula_dimensoes_info();
-
+  
   for (int i = 0; i < 2; i++) {
-    if (info_hover == i) {
+    if (info[i].destacado) {
+      desenhar_tooltip(&info[i]);
       desenhar_retangulo_info(&info[i]);
-      glColor3f(1.0f, 1.0f, 1.0f);
+      glColor3f(0.9f, 0.9f, 0.9f);
     } else {
-      glColor3f(0.92f, 0.92f, 0.92f);
+      glColor3f(0.0f, 0.0f, 0.0f);
     }
-    desenhar_texto((float)info[i].x, (float)info[i].y, menu_fonte_stroke, info[i].texto, info_escala_fonte * 0.72f);
+    desenhar_texto((float)info[i].x, (float)info[i].y, menu_fonte_stroke, info[i].texto, info_escala_fonte );
   }
 
-  if (info_hover >= 0 && info_hover < 2) desenhar_tooltip(&info[info_hover]);
 }
 
 void processar_mouse_move_info(int x, int y) {
