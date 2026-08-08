@@ -1,478 +1,353 @@
-#include "../includes/menu.h"
-#include "../includes/performance.h"
-
-#include <GL/gl.h>
+#include "./../includes/menu.h"
 #include <GL/glut.h>
-#include <stdio.h>
-#include <math.h>
 #include <string.h>
-
-extern Pontos g_clicks;
-extern int precisa_refazer_curva;
-
-#define NK_INCLUDE_DEFAULT_ALLOCATOR
-#define NK_INCLUDE_STANDARD_VARARGS
-#define NK_IMPLEMENTATION
-#include "../third_party/nuklear.h"
-
-EstadoAplicacao estado_atual = {
-    MODO_CRIAR_PONTO,
-    MODO_POLIGONO_ABERTO,
-    MODO_CURVA_HERMITE,
-    NENHUMA,
-    "0",
-    "0",
-    0
-};
+#include <stdio.h>
+EstadoAplicacao estado_atual = {MODO_CRIAR_PONTO, MODO_POLIGONO_ABERTO,
+                                MODO_CURVA_HERMITE, NENHUMA, "0", "0", 0};
 
 int menu_largura = 200;
+float menu_escala_fonte = 0.1f;
+float menu_altura_fonte = 12.0f;
+float info_escala_fonte = 5.0f;
+void *menu_fonte_stroke = GLUT_STROKE_ROMAN;
+Botoes botoes;
+BotoesOperacoes botoes_operacoes[4];
+InfoItem info[2];
+int info_hover = -1;
 
-static struct nk_context nk_ctx;
-static struct nk_user_font nk_font;
-static int nk_initialized = 0;
-static int mouse_x = 0;
-static int mouse_y = 0;
-static int mouse_left_down = 0;
-static int mouse_right_down = 0;
-static int scroll_direction = 0;
-static int mostrar_metricas = 0;
-static int menu_altura = 800;
+void atualizar_dimensoes_menu() {
+    int altura_janela = glutGet(GLUT_WINDOW_HEIGHT);
+    int largura_janela = glutGet(GLUT_WINDOW_WIDTH);
+    printf("\n\tA largura da janela é %d e a altura %d", altura_janela, largura_janela);
 
-static float font_width(nk_handle userdata, float height, const char *text, int len) {
-    (void)userdata;
-    float scale = height / 119.05f;
-    float width = 0.0f;
-    for (int i = 0; i < len; ++i) {
-        unsigned char c = (unsigned char)text[i];
-        if (c < 128) width += glutStrokeWidth(GLUT_STROKE_ROMAN, c) * scale;
-        else width += 60.0f * scale;
-    }
-    return width;
+    // Menu ocupa 15% da largura ou mínimo 150px.
+    menu_largura = (largura_janela * 0.15 < 150) ? 150 : largura_janela * 0.15;
+
+    int margem = menu_largura * 0.05;
+    int largura_botao = menu_largura - (2 * margem);
+    int altura_botao = altura_janela * 0.03;
+    int espacamento = altura_janela * 0.01;
+
+    menu_altura_fonte = altura_botao * 0.45f;
+    menu_escala_fonte = (largura_botao * 0.09f) / 121.05f;
+    info_escala_fonte = (largura_botao * 0.05f) / 121.0f;
+
+    // Painel de status: canto inferior direito do menu.
+    const int painel_margem = 8;
+    const int painel_espacamento = 8;
+    const int painel_largura = menu_largura - 2 * painel_margem;
+    const int item_altura = 24;
+    const int y_base = painel_margem;
+
+    strcpy(info[0].texto, "Pontos de controle: 0");
+    strcpy(info[0].tooltip, "Quantidade de pontos que define a forma da curva.");
+    info[0].x = painel_margem;
+    info[0].y = y_base + item_altura + painel_espacamento;
+    info[0].largura = painel_largura;
+    info[0].altura = item_altura;
+
+    strcpy(info[1].texto, "Nuvem de pontos: 0");
+    strcpy(info[1].tooltip, "Quantidade de pontos amostrados da curva atual.");
+    info[1].x = painel_margem;
+    info[1].y = y_base;
+    info[1].largura = painel_largura;
+    info[1].altura = item_altura;
+
+    // === BOTÕES DE CRIAÇÃO/SELEÇÃO (Grupo 1) ===
+    int y_inicio_grupo1 = altura_janela * 0.05;
+    strcpy(botoes.botoes1[0].texto, "Criar Ponto");
+    botoes.botoes1[0].x = margem;
+    botoes.botoes1[0].y = y_inicio_grupo1;
+    botoes.botoes1[0].largura = largura_botao;
+    botoes.botoes1[0].altura = altura_botao;
+    botoes.botoes1[0].acao = MODO_CRIAR_PONTO;
+
+    strcpy(botoes.botoes1[1].texto, "Apagar Ponto");
+    botoes.botoes1[1].x = margem;
+    botoes.botoes1[1].y = y_inicio_grupo1 + (altura_botao + espacamento);
+    botoes.botoes1[1].largura = largura_botao;
+    botoes.botoes1[1].altura = altura_botao;
+    botoes.botoes1[1].acao = MODO_APAGAR_PONTO;
+
+    strcpy(botoes.botoes1[2].texto, "Selecionar vertice");
+    botoes.botoes1[2].x = margem;
+    botoes.botoes1[2].y = y_inicio_grupo1 + 2 * (altura_botao + espacamento);
+    botoes.botoes1[2].largura = largura_botao;
+    botoes.botoes1[2].altura = altura_botao;
+    botoes.botoes1[2].acao = MODO_SELECIONAR_PONTO;
+
+    strcpy(botoes.botoes1[3].texto, "Operar Poligono");
+    botoes.botoes1[3].x = margem;
+    botoes.botoes1[3].y = y_inicio_grupo1 + 3 * (altura_botao + espacamento);
+    botoes.botoes1[3].largura = largura_botao;
+    botoes.botoes1[3].altura = altura_botao;
+    botoes.botoes1[3].acao = MODO_SELECIONAR_POLIGONO;
+
+    strcpy(botoes.botoes1[4].texto, "Selecionar Curva");
+    botoes.botoes1[4].x = margem;
+    botoes.botoes1[4].y = y_inicio_grupo1 + 4 * (altura_botao + espacamento);
+    botoes.botoes1[4].largura = largura_botao;
+    botoes.botoes1[4].altura = altura_botao;
+    botoes.botoes1[4].acao = MODO_SELEICIONAR_CURVA;
+
+    // === BOTÕES DE POLÍGONO (Grupo 2) ===
+    int y_inicio_grupo2 = y_inicio_grupo1 + 5 * (altura_botao + espacamento) + altura_janela * 0.03;
+
+    strcpy(botoes.botoes2[0].texto, "Poligono Aberto");
+    botoes.botoes2[0].x = margem;
+    botoes.botoes2[0].y = y_inicio_grupo2;
+    botoes.botoes2[0].largura = largura_botao;
+    botoes.botoes2[0].altura = altura_botao;
+    botoes.botoes2[0].acao = MODO_POLIGONO_ABERTO;
+
+    strcpy(botoes.botoes2[1].texto, "Poligono Fechado");
+    botoes.botoes2[1].x = margem;
+    botoes.botoes2[1].y = y_inicio_grupo2 + (altura_botao + espacamento);
+    botoes.botoes2[1].largura = largura_botao;
+    botoes.botoes2[1].altura = altura_botao;
+    botoes.botoes2[1].acao = MODO_POLIGONO_FECHADO;
+
+    // === BOTÕES DE CURVA (Grupo 3) ===
+    int y_inicio_grupo3 = y_inicio_grupo2 + 2 * (altura_botao + espacamento) + altura_janela * 0.03;
+
+    strcpy(botoes.botoes3[0].texto, "Hermite");
+    botoes.botoes3[0].x = margem;
+    botoes.botoes3[0].y = y_inicio_grupo3;
+    botoes.botoes3[0].largura = largura_botao;
+    botoes.botoes3[0].altura = altura_botao;
+    botoes.botoes3[0].acao = MODO_CURVA_HERMITE;
+
+    strcpy(botoes.botoes3[1].texto, "Catmull-Rom");
+    botoes.botoes3[1].x = margem;
+    botoes.botoes3[1].y = y_inicio_grupo3 + (altura_botao + espacamento);
+    botoes.botoes3[1].largura = largura_botao;
+    botoes.botoes3[1].altura = altura_botao;
+    botoes.botoes3[1].acao = MODO_CURVA_CATMULLROM;
+
+    strcpy(botoes.botoes3[2].texto, "B-Spline");
+    botoes.botoes3[2].x = margem;
+    botoes.botoes3[2].y = y_inicio_grupo3 + 2 * (altura_botao + espacamento);
+    botoes.botoes3[2].largura = largura_botao;
+    botoes.botoes3[2].altura = altura_botao;
+    botoes.botoes3[2].acao = MODO_CURVA_BSPLINE;
+
+    strcpy(botoes.botoes3[3].texto, "Bezier");
+    botoes.botoes3[3].x = margem;
+    botoes.botoes3[3].y = y_inicio_grupo3 + 3 * (altura_botao + espacamento);
+    botoes.botoes3[3].largura = largura_botao;
+    botoes.botoes3[3].altura = altura_botao;
+    botoes.botoes3[3].acao = MODO_CURVA_BEZIER;
+
+    // === BOTÕES DE OPERAÇÃO (Grupo 4) ===
+    int y_inicio_grupo4 = y_inicio_grupo3 + 4 * (altura_botao + espacamento) + altura_janela * 0.03;
+
+    strcpy(botoes_operacoes[0].texto, "Translacao");
+    botoes_operacoes[0].x = margem;
+    botoes_operacoes[0].y = y_inicio_grupo4;
+    botoes_operacoes[0].largura = largura_botao;
+    botoes_operacoes[0].altura = altura_botao;
+    botoes_operacoes[0].acao = TRANSLACAO;
+
+    strcpy(botoes_operacoes[1].texto, "Rotacao");
+    botoes_operacoes[1].x = margem;
+    botoes_operacoes[1].y = y_inicio_grupo4 + (altura_botao + espacamento);
+    botoes_operacoes[1].largura = largura_botao;
+    botoes_operacoes[1].altura = altura_botao;
+    botoes_operacoes[1].acao = ROTACAO;
+
+    strcpy(botoes_operacoes[2].texto, "Escala");
+    botoes_operacoes[2].x = margem;
+    botoes_operacoes[2].y = y_inicio_grupo4 + 2 * (altura_botao + espacamento);
+    botoes_operacoes[2].largura = largura_botao;
+    botoes_operacoes[2].altura = altura_botao;
+    botoes_operacoes[2].acao = ESCALA;
+
+    strcpy(botoes_operacoes[3].texto, "Shear");
+    botoes_operacoes[3].x = margem;
+    botoes_operacoes[3].y = y_inicio_grupo4 + 3 * (altura_botao + espacamento);
+    botoes_operacoes[3].largura = largura_botao;
+    botoes_operacoes[3].altura = altura_botao;
+    botoes_operacoes[3].acao = SHEAR;
 }
 
-static void color4(struct nk_color c) {
-    glColor4ub(c.r, c.g, c.b, c.a);
+void inicializar_menu() {
+    atualizar_dimensoes_menu();
 }
 
-static void draw_rect(float x, float y, float w, float h, struct nk_color color) {
-    color4(color);
-    glBegin(GL_QUADS);
-    glVertex2f(x, menu_altura - y);
-    glVertex2f(x + w, menu_altura - y);
-    glVertex2f(x + w, menu_altura - y - h);
-    glVertex2f(x, menu_altura - y - h);
-    glEnd();
-}
-
-static void draw_line(float x0, float y0, float x1, float y1, float thickness, struct nk_color color) {
-    color4(color);
-    glLineWidth(thickness > 0 ? thickness : 1.0f);
-    glBegin(GL_LINES);
-    glVertex2f(x0, menu_altura - y0);
-    glVertex2f(x1, menu_altura - y1);
-    glEnd();
-}
-
-static void draw_circle(float x, float y, float w, float h, struct nk_color color, int filled) {
-    color4(color);
-    float cx = x + w * 0.5f;
-    float cy = menu_altura - (y + h * 0.5f);
-    float rx = w * 0.5f;
-    float ry = h * 0.5f;
-    glBegin(filled ? GL_TRIANGLE_FAN : GL_LINE_LOOP);
-    for (int i = 0; i < 32; ++i) {
-        float a = 6.28318530718f * (float)i / 32.0f;
-        glVertex2f(cx + rx * cosf(a), cy + ry * sinf(a));
-    }
-    glEnd();
-}
-
-static void draw_triangle(float x0, float y0, float x1, float y1, float x2, float y2,
-                          struct nk_color color, int filled) {
-    color4(color);
-    glBegin(filled ? GL_TRIANGLES : GL_LINE_LOOP);
-    glVertex2f(x0, menu_altura - y0);
-    glVertex2f(x1, menu_altura - y1);
-    glVertex2f(x2, menu_altura - y2);
-    glEnd();
-}
-
-static void draw_polygon(const struct nk_vec2i *points, int count, struct nk_color color, int filled) {
-    color4(color);
-    glBegin(filled ? GL_POLYGON : GL_LINE_LOOP);
-    for (int i = 0; i < count; ++i)
-        glVertex2f(points[i].x, menu_altura - points[i].y);
-    glEnd();
-}
-
-static void draw_text(const struct nk_command_text *cmd) {
-    color4(cmd->foreground);
-    float scale = cmd->height / 119.05f;
+void desenhar_texto(float x, float y, void *font, const char *texto, float escala) {
     glPushMatrix();
-    glTranslatef((float)cmd->x, menu_altura - (float)cmd->y - cmd->height, 0.0f);
-    glScalef(scale, scale, 1.0f);
-    for (int i = 0; i < cmd->length; ++i) {
-        unsigned char c = (unsigned char)cmd->string[i];
-        if (c < 128) glutStrokeCharacter(GLUT_STROKE_ROMAN, c);
+    glTranslatef(x, y, 0.0f);
+    glScalef(escala, escala, 1.0f);
+
+    for (const char *c = texto; *c != '\0'; c++) {
+        glutStrokeCharacter(font, *c);
     }
+
     glPopMatrix();
 }
 
-static void render_nuklear(void) {
-    const struct nk_command *cmd;
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_TEXTURE_2D);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, menu_largura, 0, menu_altura, -1, 1);
+void desenhar_botao_generico(void *botao, TipoBotao tipo, int indice) {
+    int x, y, largura, altura;
+    char *texto;
+    int ativo = 0;
+    int destacado = 0;
 
-    nk_foreach(cmd, &nk_ctx) {
-        switch (cmd->type) {
-            case NK_COMMAND_SCISSOR: {
-                const struct nk_command_scissor *c = (const struct nk_command_scissor *)cmd;
-                glEnable(GL_SCISSOR_TEST);
-                glScissor(c->x, menu_altura - c->y - c->h, c->w, c->h);
-                break;
-            }
-            case NK_COMMAND_LINE: {
-                const struct nk_command_line *c = (const struct nk_command_line *)cmd;
-                draw_line(c->begin.x, c->begin.y, c->end.x, c->end.y,
-                          c->line_thickness, c->color);
-                break;
-            }
-            case NK_COMMAND_RECT: {
-                const struct nk_command_rect *c = (const struct nk_command_rect *)cmd;
-                color4(c->color);
-                glLineWidth(c->line_thickness > 0 ? c->line_thickness : 1.0f);
-                glBegin(GL_LINE_LOOP);
-                glVertex2f(c->x, menu_altura - c->y);
-                glVertex2f(c->x + c->w, menu_altura - c->y);
-                glVertex2f(c->x + c->w, menu_altura - c->y - c->h);
-                glVertex2f(c->x, menu_altura - c->y - c->h);
-                glEnd();
-                break;
-            }
-            case NK_COMMAND_RECT_FILLED: {
-                const struct nk_command_rect_filled *c = (const struct nk_command_rect_filled *)cmd;
-                draw_rect(c->x, c->y, c->w, c->h, c->color);
-                break;
-            }
-            case NK_COMMAND_RECT_MULTI_COLOR: {
-                const struct nk_command_rect_multi_color *c = (const struct nk_command_rect_multi_color *)cmd;
-                glBegin(GL_QUADS);
-                color4(c->left); glVertex2f(c->x, menu_altura - c->y);
-                color4(c->top); glVertex2f(c->x + c->w, menu_altura - c->y);
-                color4(c->right); glVertex2f(c->x + c->w, menu_altura - c->y - c->h);
-                color4(c->bottom); glVertex2f(c->x, menu_altura - c->y - c->h);
-                glEnd();
-                break;
-            }
-            case NK_COMMAND_CIRCLE: {
-                const struct nk_command_circle *c = (const struct nk_command_circle *)cmd;
-                draw_circle(c->x, c->y, c->w, c->h, c->color, 0);
-                break;
-            }
-            case NK_COMMAND_CIRCLE_FILLED: {
-                const struct nk_command_circle_filled *c = (const struct nk_command_circle_filled *)cmd;
-                draw_circle(c->x, c->y, c->w, c->h, c->color, 1);
-                break;
-            }
-            case NK_COMMAND_TRIANGLE: {
-                const struct nk_command_triangle *c = (const struct nk_command_triangle *)cmd;
-                draw_triangle(c->a.x, c->a.y, c->b.x, c->b.y, c->c.x, c->c.y, c->color, 0);
-                break;
-            }
-            case NK_COMMAND_TRIANGLE_FILLED: {
-                const struct nk_command_triangle_filled *c = (const struct nk_command_triangle_filled *)cmd;
-                draw_triangle(c->a.x, c->a.y, c->b.x, c->b.y, c->c.x, c->c.y, c->color, 1);
-                break;
-            }
-            case NK_COMMAND_POLYGON: {
-                const struct nk_command_polygon *c = (const struct nk_command_polygon *)cmd;
-                draw_polygon(c->points, c->point_count, c->color, 0);
-                break;
-            }
-            case NK_COMMAND_POLYGON_FILLED: {
-                const struct nk_command_polygon_filled *c = (const struct nk_command_polygon_filled *)cmd;
-                draw_polygon(c->points, c->point_count, c->color, 1);
-                break;
-            }
-            case NK_COMMAND_POLYLINE: {
-                const struct nk_command_polyline *c = (const struct nk_command_polyline *)cmd;
-                draw_polygon(c->points, c->point_count, c->color, 0);
-                break;
-            }
-            case NK_COMMAND_TEXT:
-                draw_text((const struct nk_command_text *)cmd);
-                break;
-            default:
-                break;
-        }
+    switch (tipo) {
+    case TIPO_BOTAO1: {
+        Botoes1 *b = (Botoes1 *)botao;
+        x = b->x; y = b->y; largura = b->largura; altura = b->altura;
+        texto = b->texto; destacado = b->destacado;
+        ativo = (estado_atual.criacao_ou_selecao == b->acao);
+        break;
     }
-    glDisable(GL_SCISSOR_TEST);
-    glEnable(GL_DEPTH_TEST);
-    nk_clear(&nk_ctx);
-}
-
-static void apply_style(void) {
-    nk_style_default(&nk_ctx);
-    nk_ctx.style.window.background = nk_rgba(36, 42, 50, 245);
-    nk_ctx.style.window.border_color = nk_rgba(80, 90, 105, 255);
-    nk_ctx.style.window.border = 1.0f;
-    nk_ctx.style.window.rounding = 4.0f;
-    nk_ctx.style.window.padding = nk_vec2(8, 8);
-    nk_ctx.style.button.normal = nk_style_item_color(nk_rgba(55, 64, 76, 255));
-    nk_ctx.style.button.hover = nk_style_item_color(nk_rgba(75, 88, 104, 255));
-    nk_ctx.style.button.active = nk_style_item_color(nk_rgba(40, 130, 80, 255));
-    nk_ctx.style.button.border_color = nk_rgba(105, 115, 130, 255);
-    nk_ctx.style.button.text_normal = nk_rgba(235, 240, 245, 255);
-    nk_ctx.style.button.text_hover = nk_rgba(255, 255, 255, 255);
-    nk_ctx.style.button.text_active = nk_rgba(255, 255, 255, 255);
-}
-
-static void draw_status_window(void) {
-    char controle[64], nuvem[64];
-    snprintf(controle, sizeof(controle), "Pontos de controle: %d", g_clicks.quantidade_atual);
-    snprintf(nuvem, sizeof(nuvem), "Nuvem de pontos: %d", estado_atual.qtd_nuvem_pontos_number);
-
-    if (nk_begin(&nk_ctx, "status",
-                 nk_rect(5, menu_altura - 94, menu_largura - 10, 88),
-                 NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
-        nk_layout_row_dynamic(&nk_ctx, 28, 1);
-        if (nk_button_label(&nk_ctx, controle)) { }
-        if (nk_widget_is_hovered(&nk_ctx))
-            nk_tooltip(&nk_ctx, "Quantidade de pontos usados para definir a forma da curva.");
-        if (nk_button_label(&nk_ctx, nuvem)) { }
-        if (nk_widget_is_hovered(&nk_ctx))
-            nk_tooltip(&nk_ctx, "Quantidade de pontos amostrados como referencia geometrica.");
+    case TIPO_BOTAO2: {
+        Botoes2 *b = (Botoes2 *)botao;
+        x = b->x; y = b->y; largura = b->largura; altura = b->altura;
+        texto = b->texto; destacado = b->destacado;
+        ativo = (estado_atual.poligono == b->acao);
+        break;
     }
-    nk_end(&nk_ctx);
-}
-
-static void draw_metrics_window(void) {
-    if (!mostrar_metricas) return;
-
-    struct nk_rect bounds = nk_rect(80, 60, 720, 620);
-    if (nk_begin(&nk_ctx, "metricas", bounds,
-                 NK_WINDOW_BORDER | NK_WINDOW_TITLE | NK_WINDOW_MOVABLE |
-                 NK_WINDOW_SCALABLE | NK_WINDOW_CLOSABLE)) {
-        nk_layout_row_dynamic(&nk_ctx, 24, 1);
-        const PerformanceMetric *current = performance_current();
-        nk_labelf(&nk_ctx, NK_TEXT_LEFT, "Maquina: %s", current->machine_id);
-        nk_labelf(&nk_ctx, NK_TEXT_LEFT, "CPU: %s", current->processor);
-        nk_labelf(&nk_ctx, NK_TEXT_LEFT, "Memoria: %s", current->memory);
-        nk_labelf(&nk_ctx, NK_TEXT_LEFT, "GPU: %s", current->gpu);
-
-        nk_layout_row_dynamic(&nk_ctx, 26, 1);
-        nk_label(&nk_ctx, "Ultima medicao", NK_TEXT_LEFT);
-        nk_labelf(&nk_ctx, NK_TEXT_LEFT, "Curva: %s", current->curve[0] ? current->curve : "-");
-        nk_labelf(&nk_ctx, NK_TEXT_LEFT, "Geracao: %.4f ms", current->generation_ms);
-        nk_labelf(&nk_ctx, NK_TEXT_LEFT, "Desenho: %.4f ms", current->drawing_ms);
-        nk_labelf(&nk_ctx, NK_TEXT_LEFT, "Pontos gerados: %zu", current->points_generated);
-        nk_labelf(&nk_ctx, NK_TEXT_LEFT, "Buffer: %zu / %zu", current->buffer_used, current->buffer_capacity);
-
-        PerformanceMetric items[64];
-        int count = performance_history(items, 64);
-
-        nk_layout_row_dynamic(&nk_ctx, 28, 1);
-        nk_label(&nk_ctx, "Resumo por tipo de curva", NK_TEXT_LEFT);
-        const char *nomes[] = {"Hermite", "Catmull-Rom", "B-Spline", "Bezier"};
-        for (int c = 0; c < 4; ++c) {
-            int n = 0;
-            double gen = 0.0, draw = 0.0;
-            size_t max_points = 0;
-            for (int i = 0; i < count; ++i) {
-                if (strcmp(items[i].curve, nomes[c]) == 0) {
-                    ++n;
-                    gen += items[i].generation_ms;
-                    draw += items[i].drawing_ms;
-                    if (items[i].points_generated > max_points) max_points = items[i].points_generated;
-                }
-            }
-            if (n > 0) {
-                nk_layout_row_dynamic(&nk_ctx, 22, 1);
-                nk_labelf(&nk_ctx, NK_TEXT_LEFT,
-                          "%s | amostras %d | geracao media %.4f ms | desenho medio %.4f ms | max pts %zu",
-                          nomes[c], n, gen / n, draw / n, max_points);
-            }
-        }
-
-        nk_layout_row_dynamic(&nk_ctx, 28, 1);
-        nk_label(&nk_ctx, "Historico salvo em data/performance.csv", NK_TEXT_LEFT);
-
-        if (nk_group_begin(&nk_ctx, "historico", NK_WINDOW_BORDER | NK_WINDOW_SCROLL_AUTO_HIDE)) {
-            nk_layout_row_dynamic(&nk_ctx, 22, 1);
-            for (int i = 0; i < count; ++i) {
-                nk_labelf(&nk_ctx, NK_TEXT_LEFT,
-                          "%s | %s | gen %.3f ms | draw %.3f ms | pts %zu",
-                          items[i].timestamp, items[i].curve,
-                          items[i].generation_ms, items[i].drawing_ms,
-                          items[i].points_generated);
-            }
-            nk_group_end(&nk_ctx);
-        }
+    case TIPO_BOTAO3: {
+        Botoes3 *b = (Botoes3 *)botao;
+        x = b->x; y = b->y; largura = b->largura; altura = b->altura;
+        texto = b->texto; destacado = b->destacado;
+        ativo = (estado_atual.curva == b->acao);
+        break;
     }
-    nk_end(&nk_ctx);
-    if (nk_window_is_closed(&nk_ctx, "metricas")) mostrar_metricas = 0;
-}
-
-static void apply_action(Criacao_ou_selecao action) {
-    precisa_refazer_curva = (estado_atual.criacao_ou_selecao != action);
-    estado_atual.criacao_ou_selecao = action;
-    if (action == MODO_CRIAR_PONTO) estado_atual.operacao = NENHUMA;
-}
-
-static void draw_sidebar(void) {
-    if (nk_begin(&nk_ctx, "menu", nk_rect(0, 0, menu_largura, menu_altura),
-                 NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_BACKGROUND)) {
-        nk_layout_row_dynamic(&nk_ctx, 26, 1);
-        nk_label(&nk_ctx, "Curvas Parametricas", NK_TEXT_CENTERED);
-        nk_spacing(&nk_ctx, 1);
-
-        nk_layout_row_dynamic(&nk_ctx, 30, 1);
-        if (nk_button_label(&nk_ctx, "Criar Ponto")) apply_action(MODO_CRIAR_PONTO);
-        if (nk_button_label(&nk_ctx, "Apagar Ponto")) apply_action(MODO_APAGAR_PONTO);
-        if (nk_button_label(&nk_ctx, "Selecionar Ponto")) apply_action(MODO_SELECIONAR_PONTO);
-        if (nk_button_label(&nk_ctx, "Operar Poligono")) apply_action(MODO_SELECIONAR_POLIGONO);
-        if (nk_button_label(&nk_ctx, "Selecionar Curva")) apply_action(MODO_SELEICIONAR_CURVA);
-
-        nk_layout_row_dynamic(&nk_ctx, 24, 1);
-        nk_label(&nk_ctx, "Poligono", NK_TEXT_LEFT);
-        nk_layout_row_dynamic(&nk_ctx, 30, 2);
-        if (nk_option_label(&nk_ctx, "Aberto", estado_atual.poligono == MODO_POLIGONO_ABERTO)) {
-            estado_atual.poligono = MODO_POLIGONO_ABERTO;
-            precisa_refazer_curva = 1;
-        }
-        if (nk_option_label(&nk_ctx, "Fechado", estado_atual.poligono == MODO_POLIGONO_FECHADO)) {
-            estado_atual.poligono = MODO_POLIGONO_FECHADO;
-            precisa_refazer_curva = 1;
-        }
-
-        nk_layout_row_dynamic(&nk_ctx, 24, 1);
-        nk_label(&nk_ctx, "Tipo de curva", NK_TEXT_LEFT);
-        nk_layout_row_dynamic(&nk_ctx, 30, 2);
-        if (nk_option_label(&nk_ctx, "Hermite", estado_atual.curva == MODO_CURVA_HERMITE)) {
-            estado_atual.curva = MODO_CURVA_HERMITE; precisa_refazer_curva = 1;
-        }
-        if (nk_option_label(&nk_ctx, "Bezier", estado_atual.curva == MODO_CURVA_BEZIER)) {
-            estado_atual.curva = MODO_CURVA_BEZIER; precisa_refazer_curva = 1;
-        }
-        if (nk_option_label(&nk_ctx, "B-Spline", estado_atual.curva == MODO_CURVA_BSPLINE)) {
-            estado_atual.curva = MODO_CURVA_BSPLINE; precisa_refazer_curva = 1;
-        }
-        if (nk_option_label(&nk_ctx, "Catmull-Rom", estado_atual.curva == MODO_CURVA_CATMULLROM)) {
-            estado_atual.curva = MODO_CURVA_CATMULLROM; precisa_refazer_curva = 1;
-        }
-
-        if (estado_atual.criacao_ou_selecao == MODO_SELECIONAR_POLIGONO) {
-            nk_layout_row_dynamic(&nk_ctx, 24, 1);
-            nk_label(&nk_ctx, "Operacoes", NK_TEXT_LEFT);
-            nk_layout_row_dynamic(&nk_ctx, 30, 2);
-            if (nk_button_label(&nk_ctx, "Translacao")) { estado_atual.operacao = TRANSLACAO; precisa_refazer_curva = 1; }
-            if (nk_button_label(&nk_ctx, "Rotacao")) { estado_atual.operacao = ROTACAO; precisa_refazer_curva = 1; }
-            if (nk_button_label(&nk_ctx, "Escala")) { estado_atual.operacao = ESCALA; precisa_refazer_curva = 1; }
-            if (nk_button_label(&nk_ctx, "Shear")) { estado_atual.operacao = SHEAR; precisa_refazer_curva = 1; }
-        }
-
-        nk_layout_row_dynamic(&nk_ctx, 34, 1);
-        if (nk_button_label(&nk_ctx, "Metricas de desempenho")) mostrar_metricas = 1;
+    case TIPO_OPERACAO: {
+        BotoesOperacoes *b = (BotoesOperacoes *)botao;
+        x = b->x; y = b->y; largura = b->largura; altura = b->altura;
+        texto = b->texto; destacado = b->destacado;
+        ativo = (estado_atual.operacao == b->acao);
+        break;
     }
-    nk_end(&nk_ctx);
-}
-
-void atualizar_dimensoes_menu(void) {
-    int width = glutGet(GLUT_WINDOW_WIDTH);
-    int height = glutGet(GLUT_WINDOW_HEIGHT);
-    menu_largura = (int)(width * 0.15f);
-    if (menu_largura < 150) menu_largura = 150;
-    if (menu_largura > width - 100) menu_largura = width - 100;
-    menu_altura = height;
-}
-
-void inicializar_menu(void) {
-    atualizar_dimensoes_menu();
-    memset(&nk_font, 0, sizeof(nk_font));
-    nk_font.height = 14.0f;
-    nk_font.width = font_width;
-    if (!nk_init_default(&nk_ctx, &nk_font)) {
-        fprintf(stderr, "Falha ao inicializar Nuklear.\n");
-        return;
     }
-    nk_initialized = 1;
-    apply_style();
+
+    if (ativo) glColor3f(0.2f, 0.7f, 0.2f);
+    else if (destacado) glColor3f(0.9f, 0.9f, 0.7f);
+    else glColor3f(0.95f, 0.95f, 0.95f);
+
+    glBegin(GL_QUADS);
+    glVertex2f(x, y); glVertex2f(x + largura, y);
+    glVertex2f(x + largura, y + altura); glVertex2f(x, y + altura);
+    glEnd();
+
+    glColor3f(0.0f, 0.0f, 0.0f);
+    glLineWidth(1.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x, y); glVertex2f(x + largura, y);
+    glVertex2f(x + largura, y + altura); glVertex2f(x, y + altura);
+    glEnd();
+
+    float texto_largura = calcular_largura_texto_stroke(menu_fonte_stroke, texto, menu_escala_fonte);
+    float texto_altura = calcular_altura_fonte_stroke(menu_escala_fonte);
+    float texto_x = x + (largura - texto_largura) / 2.0f;
+    float texto_y = y + (altura - texto_altura) / 2.0f;
+    desenhar_texto(texto_x, texto_y, menu_fonte_stroke, texto, menu_escala_fonte);
 }
 
-void menu_mouse_move(int x, int y) {
-    mouse_x = x;
-    mouse_y = y;
-}
+void desenhar_botoes_menu() {
+    for (int i = 0; i < 5; i++) desenhar_botao_generico(&botoes.botoes1[i], TIPO_BOTAO1, i);
+    for (int i = 0; i < 2; i++) desenhar_botao_generico(&botoes.botoes2[i], TIPO_BOTAO2, i);
+    for (int i = 0; i < 4; i++) desenhar_botao_generico(&botoes.botoes3[i], TIPO_BOTAO3, i);
 
-void menu_mouse_button(int button, int state, int x, int y) {
-    mouse_x = x;
-    mouse_y = y;
-    if (button == GLUT_LEFT_BUTTON) mouse_left_down = (state == GLUT_DOWN);
-    if (button == GLUT_RIGHT_BUTTON) mouse_right_down = (state == GLUT_DOWN);
-}
-
-void menu_mouse_scroll(int direction, int x, int y) {
-    mouse_x = x;
-    mouse_y = y;
-    scroll_direction = direction;
-}
-
-void menu_render(void) {
-    if (!nk_initialized) return;
-
-    int sidebar_mouse_x = mouse_x - (glutGet(GLUT_WINDOW_WIDTH) - menu_largura);
-    nk_input_begin(&nk_ctx);
-    nk_input_motion(&nk_ctx, sidebar_mouse_x, mouse_y);
-    nk_input_button(&nk_ctx, NK_BUTTON_LEFT, sidebar_mouse_x, mouse_y, mouse_left_down);
-    nk_input_button(&nk_ctx, NK_BUTTON_RIGHT, sidebar_mouse_x, mouse_y, mouse_right_down);
-    if (scroll_direction != 0) {
-        nk_input_scroll(&nk_ctx, nk_vec2(0.0f, (float)scroll_direction));
-        if (!mostrar_metricas) scroll_direction = 0;
+    if (estado_atual.criacao_ou_selecao == MODO_SELECIONAR_POLIGONO) {
+        for (int i = 0; i < 4; i++) desenhar_botao_generico(&botoes_operacoes[i], TIPO_OPERACAO, i);
+    } else if (estado_atual.criacao_ou_selecao == MODO_SELECIONAR_PONTO) {
+        desenhar_botao_generico(&botoes_operacoes[0], TIPO_OPERACAO, 0);
+        estado_atual.operacao = TRANSLACAO;
     }
-    nk_input_end(&nk_ctx);
-
-    draw_sidebar();
-    draw_status_window();
-    render_nuklear();
 }
 
-void menu_render_metricas_fullscreen(void) {
-    if (!nk_initialized || !mostrar_metricas) return;
-
-    int width = glutGet(GLUT_WINDOW_WIDTH);
-    int height = glutGet(GLUT_WINDOW_HEIGHT);
-    menu_altura = height;
-    glViewport(0, 0, width, height);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, width, 0, height, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    nk_input_begin(&nk_ctx);
-    nk_input_motion(&nk_ctx, mouse_x, mouse_y);
-    nk_input_button(&nk_ctx, NK_BUTTON_LEFT, mouse_x, mouse_y, mouse_left_down);
-    nk_input_button(&nk_ctx, NK_BUTTON_RIGHT, mouse_x, mouse_y, mouse_right_down);
-    if (scroll_direction != 0) {
-        nk_input_scroll(&nk_ctx, nk_vec2(0.0f, (float)scroll_direction));
-        scroll_direction = 0;
-    }
-    nk_input_end(&nk_ctx);
-
-    draw_metrics_window();
-    render_nuklear();
+float calcular_largura_texto_stroke(void *font, const char *texto, float escala) {
+    float largura = 0.0f;
+    for (const char *c = texto; *c != '\0'; c++) largura += glutStrokeWidth(font, *c);
+    return largura * escala;
 }
 
-void menu_shutdown(void) {
-    if (nk_initialized) {
-        nk_free(&nk_ctx);
-        nk_initialized = 0;
+float calcular_altura_fonte_stroke(float escala) {
+    return 119.05f * escala;
+}
+
+void recalcula_dimensoes_info(){
+  const float escala = info_escala_fonte * 0.72f;
+  for (int i = 0; i < 2; i++) {
+    info[i].largura = calcular_largura_texto_stroke(menu_fonte_stroke, info[i].texto, escala);
+    info[i].altura = 24.0f;
+    info[i].x = (int)(menu_largura - 8.0f - info[i].largura);
+  }
+}
+
+void atualiza_info(){
+  snprintf(info[0].texto, sizeof(info[0].texto), "Pontos de controle: %s", estado_atual.qtd_pontos_controle);
+  snprintf(info[1].texto, sizeof(info[1].texto), "Nuvem de pontos: %s", estado_atual.qtd_nuvem_pontos);
+}
+
+static void desenhar_retangulo_info(const InfoItem *item) {
+  const float largura = item->largura + 16.0f;
+  const float altura = 22.0f;
+  const float x = item->x - 8.0f;
+  const float y = item->y - 4.0f;
+
+  glColor3f(0.12f, 0.12f, 0.12f);
+  glBegin(GL_QUADS);
+  glVertex2f(x, y); glVertex2f(x + largura, y);
+  glVertex2f(x + largura, y + altura); glVertex2f(x, y + altura);
+  glEnd();
+}
+
+static void desenhar_tooltip(const InfoItem *item) {
+  const float escala = info_escala_fonte * 0.55f;
+  const float margem = 7.0f;
+  const float altura = 28.0f;
+  const float largura_texto = calcular_largura_texto_stroke(menu_fonte_stroke, item->tooltip, escala);
+  float x = item->x - largura_texto - 2.0f * margem;
+  float y = item->y + item->altura + 6.0f;
+
+  if (x < 4.0f) x = 4.0f;
+  const int altura_janela = glutGet(GLUT_WINDOW_HEIGHT);
+  if (y + altura > altura_janela - 4.0f) y = item->y - altura - 6.0f;
+
+  glColor3f(0.05f, 0.05f, 0.05f);
+  glBegin(GL_QUADS);
+  glVertex2f(x, y); glVertex2f(x + largura_texto + 2.0f * margem, y);
+  glVertex2f(x + largura_texto + 2.0f * margem, y + altura); glVertex2f(x, y + altura);
+  glEnd();
+
+  glColor3f(1.0f, 1.0f, 1.0f);
+  desenhar_texto(x + margem, y + 7.0f, menu_fonte_stroke, item->tooltip, escala);
+}
+
+void desenhar_info(){
+  atualiza_info();
+  recalcula_dimensoes_info();
+
+  for (int i = 0; i < 2; i++) {
+    if (info_hover == i) {
+      desenhar_retangulo_info(&info[i]);
+      glColor3f(1.0f, 1.0f, 1.0f);
+    } else {
+      glColor3f(0.92f, 0.92f, 0.92f);
     }
+    desenhar_texto((float)info[i].x, (float)info[i].y, menu_fonte_stroke, info[i].texto, info_escala_fonte * 0.72f);
+  }
+
+  if (info_hover >= 0 && info_hover < 2) desenhar_tooltip(&info[info_hover]);
+}
+
+void processar_mouse_move_info(int x, int y) {
+  int novo_hover = -1;
+  for (int i = 0; i < 2; i++) {
+    const float margem = 5.0f;
+    if (x >= info[i].x - margem && x <= info[i].x + info[i].largura + margem &&
+        y >= info[i].y - margem && y <= info[i].y + info[i].altura + margem) {
+      novo_hover = i;
+      break;
+    }
+  }
+
+  if (novo_hover != info_hover) {
+    info_hover = novo_hover;
+    glutPostRedisplay();
+  }
 }
