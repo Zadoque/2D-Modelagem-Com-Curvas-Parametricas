@@ -1,3 +1,10 @@
+/* Necessario para expor clock_gettime()/CLOCK_MONOTONIC do POSIX.1b,
+ * ja que o projeto compila com -std=c99 (ISO C puro), que nao inclui
+ * essas extensoes POSIX por padrao. Precisa vir antes de QUALQUER
+ * include, inclusive opengl.h, pois alguns headers do sistema travam
+ * as feature test macros no primeiro include. */
+#define _POSIX_C_SOURCE 199309L
+
 #include "./../includes/opengl.h"
 #include "./../includes/pontos.h"
 #include <stdio.h>
