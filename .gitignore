@@ -2,7 +2,8 @@
 # Ignora qualquer pasta chamada "bin" e seus conteúdos em qualquer subdiretório
 **/bin/
 **/bin/**
-
+#ignora a pasta de configuração do vscode
+**/.vscode/**
 # Recomendado: ignorar pastas de compilação também
 **/obj/
 **/obj/**
