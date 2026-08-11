@@ -4,8 +4,8 @@
 #include "pontos.h"
 #include "vetor.h"
 #include "menu.h"
-#include "aabb.h"
-
+#include "aabb.h" 
+#include "performance.h"
 // Incluir todas as curvas
 #include "curvas/hermite.h"
 #include "curvas/bezier.h"
@@ -13,18 +13,7 @@
 #include "curvas/catmullrom.h"
 #include "transformacoes.h"
 
-// Métricas da etapa de geração/desenho.
-typedef struct {
-  double tempo_geracao_ms;
-  double tempo_desenho_ms;
-  size_t pontos_gerados;
-  size_t buffer_curva_uso;
-  size_t buffer_curva_capacidade;
-  size_t buffer_controle_uso;
-  size_t buffer_controle_capacidade;
-} MetricasPerformance;
 
-extern MetricasPerformance metricas_performance;
 
 // Variáveis globais
 extern Pontos g_clicks;

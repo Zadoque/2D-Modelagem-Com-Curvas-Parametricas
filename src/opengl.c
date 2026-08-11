@@ -36,6 +36,7 @@ void initGL() {
   centro.point[1] = 0;
   centro.point[2] = 1;
   printf("OpenGL inicializado com sucesso!\n");
+
 }
 static int profundidade_arvore(AABBTREE* no) {
     if (no == NULL) return 0;
@@ -195,6 +196,7 @@ void gerar_curva_selecionada() {
     }
     //desenhar_arvore_aabb(arvore_boxes);
     //desenhar_aabbs(&vetor_boxes); //apenas para debug
+    performance_benchmark_executar(100);
   sprintf(estado_atual.qtd_nuvem_pontos, "%d", estado_atual.qtd_nuvem_pontos_number);
 }
 void desenhar_aabbs(AABB_vec* v) {

@@ -1,6 +1,14 @@
-#ifndef PERFORMANCE_BENCHMARK_H
-#define PERFORMANCE_BENCHMARK_H
-
+#ifndef PERFORMANCE_H
+#define PERFORMANCE_H
+#include "pontos.h"
+#include "vetor.h"
+#include "menu.h"
+#include "aabb.h"
+#include "opengl.h"
+#include "curvas/hermite.h"
+#include "curvas/bezier.h"
+#include "curvas/bspline.h"
+#include "curvas/catmullrom.h"
 /*
  * Benchmark determinístico de geração de curvas.
  *
@@ -19,6 +27,20 @@
  * n_execucoes: quantas vezes cada curva será gerada (recomendado >= 1000
  * para diluir ruído de medição). Se <= 0, usa 1000 como padrão.
  */
+
+// Métricas da etapa de geração/desenho.
+typedef struct {
+  double tempo_geracao_ms;
+  double tempo_desenho_ms;
+  size_t pontos_gerados;
+  size_t buffer_curva_uso;
+  size_t buffer_curva_capacidade;
+  size_t buffer_controle_uso;
+  size_t buffer_controle_capacidade;
+} MetricasPerformance;
+
+extern MetricasPerformance metricas_performance;
+
 void performance_benchmark_executar(int n_execucoes);
 
 #endif /* PERFORMANCE_BENCHMARK_H */

@@ -5,8 +5,7 @@
  * as feature test macros no primeiro include. */
 #define _POSIX_C_SOURCE 199309L
 
-#include "./../includes/opengl.h"
-#include "./../includes/pontos.h"
+#include "./../includes/performance.h"
 #include <stdio.h>
 #include <time.h>
 
