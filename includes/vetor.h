@@ -16,9 +16,9 @@
 #define VEC_SHRINK_THRESHOLD 5.0625
 
 typedef struct {
-    float *vector;
-    int quantidade_atual;
-    int quantidade_max;
+  float *vector;
+  int quantidade_atual;
+  int quantidade_max;
 } vec;
 
 /* Inicializa o vetor dinâmico */

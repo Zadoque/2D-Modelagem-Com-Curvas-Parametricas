@@ -10,7 +10,8 @@
  * centrais; os controles externos determinam as tangentes.
  */
 void arrastar_ponto_catmullrom(Pontos *clicks, int seg, float ti, ponto mouse);
-ResultadoPicking picking_catmullrom(AABBTREE *arvore, Pontos *clicks, ponto mouse, float tolerancia, float melhor_dist);
+ResultadoPicking picking_catmullrom(AABBTREE *arvore, Pontos *clicks, ponto mouse, float tolerancia,
+                                    float melhor_dist);
 ponto calcular_ponto_catmullrom(ponto P0, ponto P1, ponto P2, ponto P3, float t);
 void gerar_curva_catmullrom(ponto P0, ponto P1, ponto P2, ponto P3, Pontos *curva, AABB *box);
 

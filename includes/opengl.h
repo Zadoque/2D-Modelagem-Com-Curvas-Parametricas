@@ -4,7 +4,7 @@
 #include "pontos.h"
 #include "vetor.h"
 #include "menu.h"
-#include "aabb.h" 
+#include "aabb.h"
 #include "performance.h"
 #include "geometria_curvas.h"
 // Incluir todas as curvas
@@ -14,11 +14,9 @@
 #include "curvas/catmullrom.h"
 #include "transformacoes.h"
 
-
-
 typedef struct {
-      int indice;
-      int selecionado;
+  int indice;
+  int selecionado;
 } Selecao;
 
 typedef struct {

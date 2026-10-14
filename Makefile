@@ -11,7 +11,7 @@ TARGET := bin/curvas-parametricas-2d
 SOURCES := $(shell find src -name '*.c' -print | sort)
 OBJECTS := $(patsubst src/%.c,obj/%.o,$(SOURCES))
 
-.PHONY: all run test benchmark clean install uninstall
+.PHONY: all run test benchmark format clean install uninstall
 
 all: $(TARGET)
 
@@ -32,6 +32,15 @@ test:
 
 benchmark: $(TARGET)
 	./$(TARGET) --benchmark 1000
+
+format:
+	for source in $$(find src tests -type f -name '*.c' -print); do \
+		clang-tidy -fix -checks='-*,readability-braces-around-statements' $$source -- \
+			-std=c99 -Iincludes >/dev/null 2>&1 || exit 1; \
+	done
+	files="$$(find src includes tests -type f \( -name '*.c' -o -name '*.h' \) -print)"; \
+	clang-format -i $$files; \
+	perl -pi -e 's/\b(if|for|while|switch)\s*\(/$$1(/g; s/\) \{/)\{/g' $$files
 
 clean:
 	rm -rf obj bin

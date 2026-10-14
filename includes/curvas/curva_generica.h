@@ -9,38 +9,34 @@
 typedef void (*CurvaCubicaPesos)(float t, float pesos[4]);
 
 typedef struct {
-    CurvaCubicaEval avaliar;
-    CurvaCubicaDerivada derivar;
-    CurvaCubicaPesos pesos_controles;
+  CurvaCubicaEval avaliar;
+  CurvaCubicaDerivada derivar;
+  CurvaCubicaPesos pesos_controles;
 } CurvaCubicaOps;
 
 typedef struct {
-    float tolerancia_geometrica;
-    float tolerancia_parametrica;
-    unsigned profundidade_maxima;
-    size_t max_nos_geracao;
-    size_t max_nos_picking;
+  float tolerancia_geometrica;
+  float tolerancia_parametrica;
+  unsigned profundidade_maxima;
+  size_t max_nos_geracao;
+  size_t max_nos_picking;
 } CurvaSubdivisaoConfig;
 
 CurvaSubdivisaoConfig curva_subdivisao_config_padrao(void);
 void curva_subdivisao_definir_config(CurvaSubdivisaoConfig config);
 CurvaSubdivisaoConfig curva_subdivisao_obter_config(void);
 void curva_subdivisao_iniciar_medicao(void);
-void curva_subdivisao_ajustar_orcamento(double milissegundos,
-                                        size_t quantidade_segmentos);
+void curva_subdivisao_ajustar_orcamento(double milissegundos, size_t quantidade_segmentos);
 size_t curva_subdivisao_nos_ultima_medicao(void);
 
-void gerar_segmento_curva_cubica(const CurvaCubicaOps *ops,
-                                 ponto P0, ponto P1, ponto P2, ponto P3,
+void gerar_segmento_curva_cubica(const CurvaCubicaOps *ops, ponto P0, ponto P1, ponto P2, ponto P3,
                                  Pontos *resultado, AABB *box);
 
-ResultadoPicking picking_curva_cubica(const CurvaCubicaOps *ops,
-                                      AABBTREE *arvore, Pontos *controles,
-                                      ponto mouse, float tolerancia,
+ResultadoPicking picking_curva_cubica(const CurvaCubicaOps *ops, AABBTREE *arvore,
+                                      Pontos *controles, ponto mouse, float tolerancia,
                                       float melhor_dist);
 
-void arrastar_segmento_curva_cubica(const CurvaCubicaOps *ops,
-                                    Pontos *controles, int segmento,
+void arrastar_segmento_curva_cubica(const CurvaCubicaOps *ops, Pontos *controles, int segmento,
                                     float t, ponto mouse);
 
 #endif

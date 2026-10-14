@@ -8,12 +8,12 @@
 #define PROJECT_VERSION "desenvolvimento"
 #endif
 
-int main(int argc, char **argv) {
-  if (argc > 1 && strcmp(argv[1], "--version") == 0) {
+int main(int argc, char **argv){
+  if(argc > 1 && strcmp(argv[1], "--version") == 0){
     printf("curvas-parametricas-2d %s\n", PROJECT_VERSION);
     return 0;
   }
-  if (argc > 1 && strcmp(argv[1], "--benchmark") == 0) {
+  if(argc > 1 && strcmp(argv[1], "--benchmark") == 0){
     int execucoes = argc > 2 ? atoi(argv[2]) : 1000;
     performance_benchmark_executar(execucoes);
     return 0;

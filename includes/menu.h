@@ -89,7 +89,7 @@ extern int info_hover;
 // Funções do menu
 void atualizar_dimensoes_menu();
 void inicializar_menu();
-void desenhar_botao_generico(void* botao, TipoBotao tipo, int indice);
+void desenhar_botao_generico(void *botao, TipoBotao tipo, int indice);
 void desenhar_botoes_menu();
 void processar_clique_menu(int x, int y);
 void processar_mouse_move_menu(int x, int y);

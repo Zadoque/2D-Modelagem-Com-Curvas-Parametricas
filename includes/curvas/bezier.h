@@ -12,5 +12,6 @@
 void gerar_curva_bezier(ponto P0, ponto P1, ponto P2, ponto P3, Pontos *curva, AABB *box);
 ponto calcular_ponto_bezier(ponto P0, ponto P1, ponto P2, ponto P3, float t);
 void arrastar_ponto_bezier(Pontos *clicks, int seg, float ti, ponto mouse);
-ResultadoPicking picking_bezier(AABBTREE *arvore, Pontos *clicks, ponto mouse, float tolerancia, float melhor_dist);
+ResultadoPicking picking_bezier(AABBTREE *arvore, Pontos *clicks, ponto mouse, float tolerancia,
+                                float melhor_dist);
 #endif

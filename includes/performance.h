@@ -19,7 +19,7 @@
  *
  * Uso sugerido em main.c, antes do glutMainLoop():
  *
- *   if (argc > 1 && strcmp(argv[1], "--benchmark") == 0) {
+ *   if(argc > 1 && strcmp(argv[1], "--benchmark") == 0){
  *     performance_benchmark_executar(1000);
  *     return 0;
  *   }
@@ -40,8 +40,7 @@ typedef struct {
 } MetricasPerformance;
 
 /* Inicia uma nova medição da curva exibida, sem carregar o frame anterior. */
-void performance_definir_buffers(const Pontos *controles,
-                                 const Pontos *segmento_temporario);
+void performance_definir_buffers(const Pontos *controles, const Pontos *segmento_temporario);
 void performance_iniciar_medicao(void);
 void performance_benchmark_executar(int n_execucoes);
 
