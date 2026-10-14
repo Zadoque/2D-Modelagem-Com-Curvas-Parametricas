@@ -2,6 +2,7 @@
 #include "curvas/bspline.h"
 #include "curvas/catmullrom.h"
 #include "curvas/hermite.h"
+#include "curvas/curva_generica.h"
 
 #include <assert.h>
 #include <math.h>
@@ -72,6 +73,21 @@ int main(void) {
     assert(fabsf(hermite.data[hermite.quantidade_atual - 1].point[0] - P2.point[0]) < 1e-5f);
     assert(fabsf(hermite.data[hermite.quantidade_atual - 1].point[1] - P2.point[1]) < 1e-5f);
     pontos_free(&hermite);
+
+    CurvaSubdivisaoConfig limitada = curva_subdivisao_config_padrao();
+    limitada.tolerancia_geometrica = 1e-12f;
+    limitada.profundidade_maxima = 1;
+    limitada.max_nos_geracao = 1;
+    curva_subdivisao_definir_config(limitada);
+    pontos_init(&hermite, 8);
+    gerar_curva_bezier(P0, P1, P2, P3, &hermite, &box);
+    assert(hermite.quantidade_atual <= 7);
+    pontos_free(&hermite);
+
+    limitada.profundidade_maxima = 100;
+    curva_subdivisao_definir_config(limitada);
+    assert(curva_subdivisao_obter_config().profundidade_maxima == 20);
+    curva_subdivisao_definir_config(curva_subdivisao_config_padrao());
 
     puts("test_curvas: OK");
     return 0;

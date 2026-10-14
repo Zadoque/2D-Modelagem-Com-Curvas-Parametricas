@@ -3,7 +3,7 @@ set -euo pipefail
 
 CC=${CC:-gcc}
 CFLAGS=(-std=c99 -Wall -Wextra -Wpedantic -Werror -Iincludes)
-CURVAS=(src/pontos.c src/aabb.c src/curvas/ultis/ultis.c src/curvas/bezier.c src/curvas/bspline.c src/curvas/hermite.c src/curvas/catmullrom.c)
+CURVAS=(src/pontos.c src/aabb.c src/curvas/ultis/ultis.c src/curvas/curva_generica.c src/curvas/bezier.c src/curvas/bspline.c src/curvas/hermite.c src/curvas/catmullrom.c)
 
 build_run() {
   local nome=$1

@@ -35,6 +35,7 @@ SRC_FILES=(
   src/aabb.c
   src/transformacoes.c
   src/curvas/hermite.c
+  src/curvas/curva_generica.c
   src/curvas/bezier.c
   src/curvas/bspline.c
   src/curvas/catmullrom.c
