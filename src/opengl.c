@@ -412,11 +412,11 @@ int traduzCoordenadaY(int y) {
 
 void verificar_clique_botao_generico(void *botao, TipoBotao tipo, int x,
                                      int y) {
-  int x_botao, y_botao, altura_botao, largura_botao, mudanca;
-  Criacao_ou_selecao criacao_ou_selecao_ponto;
-  Poligono poligono;
-  Curva curva;
-  Operacoes operacao;
+  int x_botao = 0, y_botao = 0, altura_botao = 0, largura_botao = 0, mudanca = 0;
+  Criacao_ou_selecao criacao_ou_selecao_ponto = MODO_CRIAR_PONTO;
+  Poligono poligono = MODO_POLIGONO_ABERTO;
+  Curva curva = MODO_CURVA_HERMITE;
+  Operacoes operacao = NENHUMA;
   switch (tipo) {
   case TIPO_BOTAO1: {
     Botoes1 *b = (Botoes1 *)botao;
@@ -458,6 +458,8 @@ void verificar_clique_botao_generico(void *botao, TipoBotao tipo, int x,
     mudanca = 3;
     break;
   }
+  default:
+    return;
   }
   //  Verificar se clique foi dentro do botão
   if (x >= x_botao && x <= x_botao + largura_botao && y >= y_botao &&
@@ -477,7 +479,6 @@ void verificar_clique_botao_generico(void *botao, TipoBotao tipo, int x,
     case 2:
       precisa_refazer_curva = (curva == estado_atual.curva) ? 0 : 1;
       estado_atual.curva = curva;
-      printf("Agora é %u\n", estado_atual.curva);
       break;
     case 3:
       precisa_refazer_curva = (operacao == estado_atual.operacao ) ? 0 : 1;

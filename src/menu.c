@@ -34,7 +34,6 @@ void atualizar_dimensoes_menu() {
     // Painel de status: canto inferior direito do menu.
     const int painel_margem = margem / 2;
     const int painel_espacamento = espacamento / 2;
-    const int painel_largura = menu_largura - 2 * painel_margem;
     const int item_altura = altura_botao * 0.9;
     const int y_base = painel_margem;
 
@@ -188,6 +187,7 @@ void desenhar_texto(float x, float y, void *font, const char *texto, float escal
 }
 
 void desenhar_botao_generico(void *botao, TipoBotao tipo, int indice) {
+    (void)indice;
     int x, y, largura, altura;
     char *texto;
     int ativo = 0;
@@ -222,6 +222,8 @@ void desenhar_botao_generico(void *botao, TipoBotao tipo, int indice) {
         ativo = (estado_atual.operacao == b->acao);
         break;
     }
+    default:
+        return;
     }
 
     if (ativo) glColor3f(0.2f, 0.7f, 0.2f);
