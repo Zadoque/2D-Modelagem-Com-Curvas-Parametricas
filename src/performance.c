@@ -9,7 +9,15 @@
 #include <stdio.h>
 #include <time.h>
 
-MetricasPerformance metricas_performance = {0};
+static MetricasPerformance metricas_performance = {0};
+static const Pontos *buffer_controles;
+static const Pontos *buffer_segmento;
+
+void __attribute__((no_instrument_function))
+performance_definir_buffers(const Pontos *controles, const Pontos *segmento) {
+  buffer_controles = controles;
+  buffer_segmento = segmento;
+}
 
 static double __attribute__((no_instrument_function)) agora_ms(void) {
   return (double)clock() * 1000.0 / (double)CLOCKS_PER_SEC;
@@ -37,9 +45,9 @@ void __attribute__((no_instrument_function)) performance_iniciar_medicao(void) {
 
   /* Estes campos representam estado instantâneo, não acumuladores. */
   metricas_performance.buffer_curva_uso = 0;
-  metricas_performance.buffer_curva_capacidade = g_curva_atual.quantidade_max;
-  metricas_performance.buffer_controle_uso = g_clicks.quantidade_atual;
-  metricas_performance.buffer_controle_capacidade = g_clicks.quantidade_max;
+  metricas_performance.buffer_curva_capacidade = buffer_segmento ? buffer_segmento->quantidade_max : 0;
+  metricas_performance.buffer_controle_uso = buffer_controles ? buffer_controles->quantidade_atual : 0;
+  metricas_performance.buffer_controle_capacidade = buffer_controles ? buffer_controles->quantidade_max : 0;
 }
 
 void __attribute__((no_instrument_function))
@@ -69,14 +77,14 @@ __cyg_profile_func_exit(void *func, void *caller) {
     /* Soma apenas os segmentos da reconstrução atual. O início de cada
      * reconstrução chama performance_iniciar_medicao() e zera o frame anterior. */
     metricas_performance.tempo_geracao_ms += agora_ms() - inicio;
-    metricas_performance.pontos_gerados += g_curva_atual.quantidade_atual;
+    metricas_performance.pontos_gerados += buffer_segmento ? buffer_segmento->quantidade_atual : 0;
   } else if (func == (void *)&desenhar_curva_atual) {
     metricas_performance.tempo_desenho_ms += agora_ms() - inicio_desenho;
 
-    metricas_performance.buffer_curva_uso = g_curva_atual.quantidade_atual;
-    metricas_performance.buffer_curva_capacidade = g_curva_atual.quantidade_max;
-    metricas_performance.buffer_controle_uso = g_clicks.quantidade_atual;
-    metricas_performance.buffer_controle_capacidade = g_clicks.quantidade_max;
+    metricas_performance.buffer_curva_uso = buffer_segmento ? buffer_segmento->quantidade_atual : 0;
+    metricas_performance.buffer_curva_capacidade = buffer_segmento ? buffer_segmento->quantidade_max : 0;
+    metricas_performance.buffer_controle_uso = buffer_controles ? buffer_controles->quantidade_atual : 0;
+    metricas_performance.buffer_controle_capacidade = buffer_controles ? buffer_controles->quantidade_max : 0;
 
     printf("[PERF] geracao=%.3f ms | desenho=%.3f ms | pontos=%zu | "
            "buffer curva=%zu/%zu | buffer controle=%zu/%zu\n",

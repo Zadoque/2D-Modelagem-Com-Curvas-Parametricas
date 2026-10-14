@@ -1,11 +1,6 @@
 #ifndef AABB_H
 #define AABB_H
 #include <stdbool.h>
-typedef struct {
-    float x_min, y_min;
-    float x_max, y_max;
-} AABB_METADE;
-
 typedef struct aabb {
     float x_min, y_min;
     float x_max, y_max;

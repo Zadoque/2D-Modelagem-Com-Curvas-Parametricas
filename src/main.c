@@ -18,8 +18,6 @@ int main(int argc, char **argv) {
   glutPassiveMotionFunc(onMouseMove);
   glutMotionFunc(onMotion);
 
-  // Inicializar estruturas de dados para os pontos
-  pontos_init(&g_clicks, 20);
   // Inicializar menu
   inicializar_menu();
   // Inicializar OpenGL
@@ -31,7 +29,6 @@ int main(int argc, char **argv) {
   glutMainLoop();
 
   // Limpeza (nunca será executada devido ao glutMainLoop)
-  pontos_free(&g_clicks);
-  pontos_free(&g_curva_atual);
+  finalizar_aplicacao();
   return 0;
 }

@@ -3,20 +3,6 @@
 
 #include <stdlib.h>
 
-// Matrizes constantes para curvas
-extern const float HERMITE[4][4];
-extern const float BEZIER[4][4];
-extern const float BSPLINE[4][4];
-extern const float CATMULLROM[4][4];
-
-// Tipos para curvas e pontos
-typedef enum {
-  CURVE_HERMITE,
-  CURVE_BEZIER,
-  CURVE_BSPLINE,
-  CURVE_CATMULLROM
-} CurveType;
-
 typedef struct {
     int   segmento_indice;  // qual segmento foi clicado (-1 se nenhum)
     float t;                // parâmetro no segmento [0,1]
@@ -37,8 +23,6 @@ typedef struct {
 void pontos_init(Pontos *v, size_t cap0);
 int pontos_push(Pontos *v, ponto p);
 void pontos_free(Pontos *v);
-void esvazia_points(Pontos *v);
-double raiz_quadrada_newton(double n);
 /**
 * Recebe dois pontos e retorna a distância entre eles como float
 * @param ponto P1 -> primeiro ponto

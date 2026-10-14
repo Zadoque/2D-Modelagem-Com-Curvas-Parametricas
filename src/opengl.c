@@ -8,15 +8,15 @@
 #define FLT_MAX  99999999.0f
 #endif
 // Variáveis globais
-Pontos g_clicks;
-Pontos g_curva_atual; // Nova: armazenar pontos da curva gerada
-Selecao selecao_ponto;
-Selecao_curva selecao_curva;
-int selecao_poligono;
-ponto centro;
-int precisa_refazer_curva = 0;
-AABB_vec vetor_boxes;
-AABBTREE *arvore_boxes = NULL;
+static Pontos g_clicks;
+static Pontos g_curva_atual;
+static Selecao selecao_ponto;
+static Selecao_curva selecao_curva;
+static int selecao_poligono;
+static ponto centro;
+static int precisa_refazer_curva;
+static AABB_vec vetor_boxes;
+static AABBTREE *arvore_boxes;
 static GeometriaCurvas geometria_curva;
 // Configurações visuais
 static float cor_fundo[3] = {0.2f, 0.3f, 0.4f};
@@ -27,7 +27,9 @@ void initGL() {
   glLineWidth(2.0f);
 
   // Inicializar estrutura para curva
+  pontos_init(&g_clicks, 20);
   pontos_init(&g_curva_atual, 100);
+  performance_definir_buffers(&g_clicks, &g_curva_atual);
   geometria_curvas_init(&geometria_curva);
   aabb_vec_init(&vetor_boxes, 20);
   selecao_ponto.selecionado = 0;
@@ -38,6 +40,14 @@ void initGL() {
   centro.point[2] = 1;
   printf("OpenGL inicializado com sucesso!\n");
 
+}
+
+void finalizar_aplicacao(void) {
+  aabb_tree_free(arvore_boxes);
+  free(vetor_boxes.dados);
+  geometria_curvas_free(&geometria_curva);
+  pontos_free(&g_curva_atual);
+  pontos_free(&g_clicks);
 }
 static int profundidade_arvore(AABBTREE* no) {
     if (no == NULL) return 0;

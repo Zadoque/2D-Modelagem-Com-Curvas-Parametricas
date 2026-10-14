@@ -16,10 +16,6 @@
 
 
 
-// Variáveis globais
-extern Pontos g_clicks;
-extern Pontos g_curva_atual;
-
 typedef struct {
       int indice;
       int selecionado;
@@ -32,10 +28,10 @@ typedef struct {
 } Selecao_curva;
 
 void initGL();
+void finalizar_aplicacao(void);
 void AlteraTamanhoJanela(int w, int h);
 void display();
 void desenhar_conteudo_principal();
-void desenhar_aabbs(AABB_vec* v);
 void gerar_curva_selecionada();
 void desenhar_curva_atual();
 void onMouse(int button, int state, int x, int y);

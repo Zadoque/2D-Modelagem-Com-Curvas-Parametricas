@@ -6,10 +6,10 @@ EstadoAplicacao estado_atual = {MODO_CRIAR_PONTO, MODO_POLIGONO_ABERTO,
                                 MODO_CURVA_HERMITE, NENHUMA, "0", "0", 0};
 
 int menu_largura = 200;
-float menu_escala_fonte = 0.1f;
-float menu_altura_fonte = 12.0f;
-float info_escala_fonte = 5.0f;
-void *menu_fonte_stroke = GLUT_STROKE_ROMAN;
+static float menu_escala_fonte = 0.1f;
+static float menu_altura_fonte = 12.0f;
+static float info_escala_fonte = 5.0f;
+static void *menu_fonte_stroke = GLUT_STROKE_ROMAN;
 
 Botoes botoes;
 BotoesOperacoes botoes_operacoes[4];

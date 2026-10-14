@@ -39,9 +39,9 @@ typedef struct {
   size_t buffer_controle_capacidade;
 } MetricasPerformance;
 
-extern MetricasPerformance metricas_performance;
-
 /* Inicia uma nova medição da curva exibida, sem carregar o frame anterior. */
+void performance_definir_buffers(const Pontos *controles,
+                                 const Pontos *segmento_temporario);
 void performance_iniciar_medicao(void);
 void performance_benchmark_executar(int n_execucoes);
 
