@@ -5,6 +5,23 @@
 static CurvaSubdivisaoConfig config_atual = {
     0.1f, 0.001f, 20u, 131071u, 8191u
 };
+static size_t nos_ultima_medicao;
+static double vazao_media_nos_ms;
+
+void curva_subdivisao_iniciar_medicao(void) { nos_ultima_medicao = 0; }
+size_t curva_subdivisao_nos_ultima_medicao(void) { return nos_ultima_medicao; }
+void curva_subdivisao_ajustar_orcamento(double ms, size_t segmentos) {
+    const double alvo_ms = 4.0, margem = 0.75;
+    if (ms < 0.05 || segmentos == 0 || nos_ultima_medicao < 16) return;
+    double vazao = (double)nos_ultima_medicao / ms;
+    vazao_media_nos_ms = vazao_media_nos_ms == 0.0
+        ? vazao : vazao_media_nos_ms * 0.8 + vazao * 0.2;
+    size_t por_segmento = (size_t)(vazao_media_nos_ms * alvo_ms * margem /
+                                    (double)segmentos);
+    if (por_segmento < 255u) por_segmento = 255u;
+    if (por_segmento > 131071u) por_segmento = 131071u;
+    config_atual.max_nos_geracao = por_segmento;
+}
 
 CurvaSubdivisaoConfig curva_subdivisao_config_padrao(void) {
     CurvaSubdivisaoConfig c = {0.1f, 0.001f, 20u, 131071u, 8191u};
@@ -17,8 +34,10 @@ void curva_subdivisao_definir_config(CurvaSubdivisaoConfig c) {
     if (!(c.tolerancia_parametrica > 0.0f)) c.tolerancia_parametrica = padrao.tolerancia_parametrica;
     if (c.profundidade_maxima == 0 || c.profundidade_maxima > 20u)
         c.profundidade_maxima = padrao.profundidade_maxima;
-    if (c.max_nos_geracao == 0) c.max_nos_geracao = padrao.max_nos_geracao;
-    if (c.max_nos_picking == 0) c.max_nos_picking = padrao.max_nos_picking;
+    if (c.max_nos_geracao == 0 || c.max_nos_geracao > 131071u)
+        c.max_nos_geracao = padrao.max_nos_geracao;
+    if (c.max_nos_picking == 0 || c.max_nos_picking > 8191u)
+        c.max_nos_picking = padrao.max_nos_picking;
     config_atual = c;
 }
 
@@ -35,6 +54,7 @@ static void subdividir_geracao(const CurvaCubicaOps *ops, ponto P0, ponto P1,
                                ponto A, ponto B, float t0, float t1,
                                unsigned profundidade, size_t *nos) {
     float tmid = t0 + (t1 - t0) * 0.5f;
+    nos_ultima_medicao++;
     ponto M = ops->avaliar(P0, P1, P2, P3, tmid);
     float desvio = calcula_dist_ponto_segmento(M, A, B);
     int parar = profundidade >= config_atual.profundidade_maxima ||

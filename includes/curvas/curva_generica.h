@@ -25,6 +25,10 @@ typedef struct {
 CurvaSubdivisaoConfig curva_subdivisao_config_padrao(void);
 void curva_subdivisao_definir_config(CurvaSubdivisaoConfig config);
 CurvaSubdivisaoConfig curva_subdivisao_obter_config(void);
+void curva_subdivisao_iniciar_medicao(void);
+void curva_subdivisao_ajustar_orcamento(double milissegundos,
+                                        size_t quantidade_segmentos);
+size_t curva_subdivisao_nos_ultima_medicao(void);
 
 void gerar_segmento_curva_cubica(const CurvaCubicaOps *ops,
                                  ponto P0, ponto P1, ponto P2, ponto P3,
