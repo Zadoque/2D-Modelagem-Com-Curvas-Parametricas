@@ -62,7 +62,7 @@ static void subdividir_geracao(const CurvaCubicaOps *ops, ponto P0, ponto P1,
                 desvio <= config_atual.tolerancia_geometrica ||
                 !consumir_no(nos);
     if (parar) {
-        if (isfinite(M.point[0]) && isfinite(M.point[1])) pontos_push(resultado, M);
+        if (isfinite(B.point[0]) && isfinite(B.point[1])) pontos_push(resultado, B);
         return;
     }
     subdividir_geracao(ops,P0,P1,P2,P3,resultado,A,M,t0,tmid,profundidade+1,nos);
@@ -82,9 +82,7 @@ void gerar_segmento_curva_cubica(const CurvaCubicaOps *ops,
     size_t nos=config_atual.max_nos_geracao;
     pontos_push(resultado,A);
     subdividir_geracao(ops,P0,P1,P2,P3,resultado,A,M,0,0.5f,0,&nos);
-    pontos_push(resultado,M);
     subdividir_geracao(ops,P0,P1,P2,P3,resultado,M,B,0.5f,1,0,&nos);
-    pontos_push(resultado,B);
     box->esq_x_min=esquerda.x_min; box->esq_y_min=esquerda.y_min;
     box->esq_x_max=esquerda.x_max; box->esq_y_max=esquerda.y_max;
     box->dir_x_min=direita.x_min; box->dir_y_min=direita.y_min;
