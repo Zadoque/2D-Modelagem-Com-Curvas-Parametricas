@@ -1,133 +1,38 @@
-# 📐 2D Parametric Curve Generator
+# 2D modeling with parametric curves
 
-> **Computer Graphics Assignment — UENF 2025/2026**
-> Interactive C + OpenGL application for generating, visualizing, and manipulating closed parametric curves, with efficient mouse picking via an AABB tree structure.
+Interactive C99/OpenGL application for Bézier, Hermite, uniform B-Spline, and
+Catmull–Rom curves, with adaptive subdivision, transformations, and AABB-tree
+picking. Current version: **0.1.0**. [Portuguese documentation](README.md).
 
-> 🇧🇷 A Portuguese version of this README is available in [Readme.md](./Readme.md).
+## Build
 
----
+Install a C compiler, GNU Make, OpenGL, GLU, and FreeGLUT. On Debian/Ubuntu:
 
-## 🎯 Goal
-
-Build an interactive 2D graphics application where users can define control points by clicking and visualize closed parametric curves in real time, with geometric transformations and precise mouse picking.
-
----
-
-## ✅ Implemented Features
-
-### 📊 Supported Curves
-- [x] **Hermite**
-- [x] **Bézier**
-- [x] **B-Spline** (with adaptive subdivision)
-- [x] **Catmull-Rom**
-
-### 🖱️ Interaction
-- [x] Control point creation via mouse click
-- [x] Visualizable closed control polygon
-- [x] Vertex selection and drag (mouse picking)
-- [x] Curve type switching
-- [x] Interactive side menu
-
-### 🔄 Geometric Transformations
-- [x] Translation
-- [x] Rotation around a point
-- [x] Scale
-- [ ] Mirroring / Reflection
-- [ ] Shear
-
-### ⚡ Efficient Picking (B-Spline)
-- [x] Hierarchical **AABB Tree** built per segment
-- [x] Pruning by mouse-to-box distance (`best_dist` propagated)
-- [x] Closest-child-first traversal
-- [x] Adaptive `t` refinement via binary subdivision at the leaf
-- [x] Debug visualization of AABBs (by index and by hierarchy level)
-
----
-
-## 🏗️ Project Structure
-
-```
-comp_grafica_trabalho_1/
-├── src/
-│   ├── curvas/
-│   │   └── bspline.c         # Evaluation, adaptive subdivision, picking
-│   ├── opengl.c              # Main loop, events, rendering
-│   └── ...
-├── includes/
-│   ├── curvas/
-│   │   └── bspline.h
-│   ├── tipos.h               # ponto, Pontos, AABB, AABBTREE, ResultadoPicking
-│   └── ...
-├── MakeFile.sh               # Build & run script
-└── shell.nix                 # Nix environment (optional)
+```sh
+sudo apt update
+sudo apt install build-essential freeglut3-dev libgl1-mesa-dev libglu1-mesa-dev
+make
+make run
 ```
 
----
+Use `make test`, `make benchmark`, and `make clean` for the corresponding
+tasks. A non-pinned `shell.nix` is also available.
 
-## 🧠 Technical Highlights
+## Guarantees and limitations
 
-### Adaptive Subdivision
-The curve is generated recursively. Given two endpoints `A` and `B` on interval `[t0, t1]`, the midpoint `M` is computed. If `M` lies close enough to segment `AB` (within tolerance), the point is accepted. Otherwise the interval is split into `[t0, tmid]` and `[tmid, t1]`. This ensures point density proportional to curvature.
+- Conservative AABBs derive from equivalent Bézier control hulls.
+- Recursion is capped at 20 levels and constrained by node budgets.
+- Generation work adapts to measured machine throughput.
+- Picking and rendering are approximations and may hit work limits before the
+  requested tolerance in extreme cases.
+- Picking trees are intentionally rebuilt only on mouse release.
+- Tolerances use world coordinates rather than pixels.
+- Only one active curve is supported; there is no persistence or undo/redo.
+- The immediate-mode OpenGL interface has been validated on Linux only.
 
-### AABB Tree for Picking
-Each B-Spline segment has its own AABB computed from the **actual curve points** (not the control points), producing tight bounding boxes. A hierarchical binary tree groups segments, enabling efficient pruning: picking descends the tree by prioritizing the child whose box is closest to the mouse, using `best_dist` to discard branches that cannot improve the current best result.
+See the [Portuguese README](README.md) for all installation commands,
+architecture, test coverage, benchmark usage, and installation targets.
 
-### `t` Refinement at the Leaf
-When a candidate leaf is reached, `subdivide_picking_bspline` performs binary subdivision on `[0, 1]` within the segment — computing the AABB of each half and descending toward the mouse — until `t1 - t0 < 0.001`, at which point it returns the `t` and the actual distance to the curve point.
+## License
 
----
-
-## 💻 Technologies
-
-| Item | Detail |
-|------|--------|
-| Language | C (C99) |
-| Graphics | OpenGL + GLUT |
-| Compiler | GCC |
-| Platform | Linux (also buildable on Windows with MinGW) |
-| Optional env | Nix (`shell.nix`) |
-
----
-
-## ⚡ How to Run
-
-```bash
-# Clone the repository
-git clone https://github.com/Zadoque/comp_grafica_trabalho_1
-cd comp_grafica_trabalho_1
-
-# Build and run
-chmod +x MakeFile.sh
-./MakeFile.sh
-```
-
-> **Dependencies:** `gcc`, `libGL`, `libGLU`, `freeglut` (or `libglut`).
-> With Nix: `nix-shell` sets up the full environment automatically.
-
----
-
-## 🎮 Controls
-
-| Action | Command |
-|--------|----------|
-| Add control point | Left click |
-| Select / drag vertex | Left click on point |
-| Switch curve type | Side menu |
-| Apply transformation | Side menu |
-| Quit | `ESC` |
-
----
-
-## 🔧 Planned Improvements
-
-- [ ] **AABBTREE memory arena** — eliminate cache misses by allocating all tree nodes in a single contiguous array (`2n - 1` nodes for `n` segments), replacing per-node `malloc` with a single allocation
-- [ ] **Pre-compute `box_left` / `box_right`** — store the AABBs for both halves of each segment directly inside the `AABB` struct, removing the redundant `criar_box_picking` calls during picking
-- [ ] Mirroring and shear transformations
-- [ ] Support for multiple simultaneous curves
-
----
-
-## 👨‍💻 Author
-
-**Zadoque Carneiro** — Computer Science student, UENF  
-[github.com/Zadoque](https://github.com/Zadoque)
+Released under the [MIT License](LICENSE). Copyright © 2026 Zadoque Carneiro.
