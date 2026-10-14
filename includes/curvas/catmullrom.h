@@ -6,10 +6,8 @@
 #include "ultis/ultis.h"
 /**
  * Curva Catmull-Rom
- * - SEMPRE passa pelos pontos de controle
- * - Tangentes calculadas automaticamente
- * - Interpolação suave entre pontos
- * - Ideal para trajetórias e animações
+ * Cada trecho definido por quatro controles interpola os dois controles
+ * centrais; os controles externos determinam as tangentes.
  */
 void arrastar_ponto_catmullrom(Pontos *clicks, int seg, float ti, ponto mouse);
 ResultadoPicking picking_catmullrom(AABBTREE *arvore, Pontos *clicks, ponto mouse, float tolerancia, float melhor_dist);

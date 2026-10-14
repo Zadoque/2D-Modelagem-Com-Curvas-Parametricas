@@ -1,6 +1,6 @@
-/* Necessario para expor clock_gettime()/CLOCK_MONOTONIC do POSIX.1b,
- * ja que o projeto compila com -std=c99 (ISO C puro), que nao inclui
- * essas extensoes POSIX por padrao. Precisa vir antes de QUALQUER
+/* Necessário para expor clock_gettime()/CLOCK_MONOTONIC do POSIX.1b,
+ * já que o projeto compila com -std=c99, que não inclui essas extensões
+ * por padrão. Precisa vir antes de qualquer
  * include, inclusive opengl.h, pois alguns headers do sistema travam
  * as feature test macros no primeiro include. */
 #define _POSIX_C_SOURCE 199309L
@@ -24,7 +24,7 @@ static double __attribute__((no_instrument_function)) agora_ms(void) {
 }
 
 /* Cronômetro de maior resolução, usado apenas pelo benchmark controlado
- * (não pela instrumentação -finstrument-functions, que roda em runtime
+ * (não pela instrumentação -finstrument-functions, executada durante o uso
  * interativo e não pode pagar o custo de uma syscall por chamada). */
 static double __attribute__((no_instrument_function)) agora_ms_precisa(void) {
   struct timespec ts;
@@ -105,7 +105,7 @@ __cyg_profile_func_exit(void *func, void *caller) {
  *   - usa pontos de controle FIXOS (não vem de clique de mouse);
  *   - roda um número FIXO e conhecido de execuções (n_execucoes);
  *   - descarta um "aquecimento" (warmup) antes de medir, evitando ruído
- *     de cache miss / branch prediction da primeira chamada;
+ *     de cache e predição de desvios da primeira chamada;
  *   - mede com clock_gettime(CLOCK_MONOTONIC), que tem resolução muito
  *     maior que clock() (clock() no glibc/Linux costuma ter granularidade
  *     de ~10ms, o que é grosseiro demais para medir uma única geração de

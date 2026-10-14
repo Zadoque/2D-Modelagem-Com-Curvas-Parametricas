@@ -39,9 +39,9 @@ void aabb_vec_init(AABB_vec* v, int capacidade_inicial) {
 }
 
 
-// Atualizado para receber o ponteiro da arena e o controle de índice
+/* Constrói a hierarquia diretamente na arena contígua. */
 static AABBTREE* construir_recursivo(AABB* dados, int inicio, int fim, AABBTREE* arena, int* proximo) {
-    // Em vez de malloc, pegamos o próximo nó disponível na arena
+    // Reserva o próximo nó disponível na arena.
     AABBTREE* no = &arena[(*proximo)++];
 
 

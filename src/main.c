@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   // Loop principal
   glutMainLoop();
 
-  // Limpeza (nunca será executada devido ao glutMainLoop)
+  // Algumas implementações de GLUT permitem que o loop principal retorne.
   finalizar_aplicacao();
   return 0;
 }

@@ -19,14 +19,12 @@ int info_hover = -1;
 void atualizar_dimensoes_menu() {
     int altura_janela = glutGet(GLUT_WINDOW_HEIGHT);
     int largura_janela = glutGet(GLUT_WINDOW_WIDTH);
-    printf("\n\tA largura da janela é %d e a altura %d", altura_janela, largura_janela);
-
     // Menu ocupa 15% da largura ou mínimo 150px.
     menu_largura = (largura_janela * 0.15 < 150) ? 150 : largura_janela * 0.15;
 
     int margem = menu_largura * 0.05;
     int largura_botao = menu_largura - (2 * margem);
-    int altura_botao = altura_janela * 0.03; // 3% da atura da janela
+    int altura_botao = altura_janela * 0.03; // 3% da altura da janela
     int espacamento = altura_janela * 0.01; // 1% da altura da janela
 
     menu_altura_fonte = altura_botao * 0.45f;
@@ -72,14 +70,14 @@ void atualizar_dimensoes_menu() {
     botoes.botoes1[1].altura = altura_botao;
     botoes.botoes1[1].acao = MODO_APAGAR_PONTO;
 
-    strcpy(botoes.botoes1[2].texto, "Selecionar vertice");
+    strcpy(botoes.botoes1[2].texto, "Selecionar ponto");
     botoes.botoes1[2].x = margem;
     botoes.botoes1[2].y = y_inicio_grupo1 + 2 * (altura_botao + espacamento);
     botoes.botoes1[2].largura = largura_botao;
     botoes.botoes1[2].altura = altura_botao;
     botoes.botoes1[2].acao = MODO_SELECIONAR_PONTO;
 
-    strcpy(botoes.botoes1[3].texto, "Operar Poligono");
+    strcpy(botoes.botoes1[3].texto, "Operar forma");
     botoes.botoes1[3].x = margem;
     botoes.botoes1[3].y = y_inicio_grupo1 + 3 * (altura_botao + espacamento);
     botoes.botoes1[3].largura = largura_botao;

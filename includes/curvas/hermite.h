@@ -6,9 +6,8 @@
 #include "ultis/ultis.h"
 /**
  * Curva de Hermite
- * - Conecta 2 pontos usando vetores tangentes
- * - Controla a "velocidade" de entrada e saída
- * - Ideal para animações suaves
+ * Interpola os dois pontos centrais. As tangentes são calculadas a partir
+ * dos quatro controles recebidos por gerar_curva_hermite.
  */
 
 // Gerar curva Hermite completa

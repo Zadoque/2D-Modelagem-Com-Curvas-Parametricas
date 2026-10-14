@@ -7,7 +7,7 @@
 #ifndef FLT_MAX
 #define FLT_MAX  99999999.0f
 #endif
-// Variáveis globais
+/* Estado privado da interface. */
 static Pontos g_clicks;
 static Pontos g_curva_atual;
 static Selecao selecao_ponto;
@@ -18,7 +18,7 @@ static int precisa_refazer_curva;
 static AABB_vec vetor_boxes;
 static AABBTREE *arvore_boxes;
 static GeometriaCurvas geometria_curva;
-// Configurações visuais
+/* Configurações visuais. */
 static float cor_fundo[3] = {0.2f, 0.3f, 0.4f};
 
 void initGL() {
@@ -133,7 +133,6 @@ void desenhar_curva_atual() {
   }
 }
 
-// Suas funções existentes...
 void AlteraTamanhoJanela(int w, int h) {
   // Recalcular dimensões do menu
   atualizar_dimensoes_menu();
@@ -418,7 +417,6 @@ void verificar_clique_botao_generico(void *botao, TipoBotao tipo, int x,
   Poligono poligono;
   Curva curva;
   Operacoes operacao;
-  // printf("função começa\n");
   switch (tipo) {
   case TIPO_BOTAO1: {
     Botoes1 *b = (Botoes1 *)botao;
@@ -530,7 +528,6 @@ void onMouse(int button, int state, int x, int y) {
       gerar_curva_selecionada();
       // Libera árvore anterior antes de recriar
       aabb_tree_free(arvore_boxes);
-      printf("a quantidade de caixas é: %d", vetor_boxes.quantidade);
       arvore_boxes = aabb_vec_para_arvore(&vetor_boxes);
       if (selecao_ponto.selecionado) {
         selecao_ponto.selecionado = 0;
@@ -606,7 +603,6 @@ void onMouseMove(int x, int y) {
       information->destacado =  estado;
     }
     if(change){ 
-      //precis_recalcular_curva
       precisa_refazer_curva = 1;
       glutPostRedisplay();
     }

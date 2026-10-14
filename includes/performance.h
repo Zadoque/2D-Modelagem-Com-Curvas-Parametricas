@@ -45,4 +45,4 @@ void performance_definir_buffers(const Pontos *controles,
 void performance_iniciar_medicao(void);
 void performance_benchmark_executar(int n_execucoes);
 
-#endif /* PERFORMANCE_BENCHMARK_H */
+#endif /* PERFORMANCE_H */
