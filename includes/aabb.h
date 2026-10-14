@@ -33,7 +33,7 @@ void aabb_vec_init(AABB_vec* v, int capacidade_inicial);
 void reset_box(AABB *box);
 float calcula_area_box(AABB *box);
 // Adiciona uma AABB, realoca 1.5x se necessário
-void aabb_vec_push(AABB_vec* v, AABB box);
+int aabb_vec_push(AABB_vec* v, AABB box);
 
 // Testa se ponto está dentro da caixa — sem branch
 int ponto_dentro_aabb(AABB box, float px, float py);

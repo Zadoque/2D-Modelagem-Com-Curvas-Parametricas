@@ -32,6 +32,23 @@ ponto calcular_ponto_bspline(ponto P0, ponto P1, ponto P2, ponto P3, float t) {
                          coeficientes[2] * P2.point[1] + coeficientes[3] * P3.point[1];
     return resultado;
 }
+
+static ponto derivada_bspline(ponto P0, ponto P1, ponto P2, ponto P3, float t) {
+    float t2 = t * t;
+    float pesos[4] = {
+        (-3.0f*t2 + 6.0f*t - 3.0f) / 6.0f,
+        ( 9.0f*t2 - 12.0f*t) / 6.0f,
+        (-9.0f*t2 + 6.0f*t + 3.0f) / 6.0f,
+        ( 3.0f*t2) / 6.0f
+    };
+    ponto controles[4] = {P0, P1, P2, P3};
+    ponto r = {{0.0f, 0.0f, 0.0f}};
+    for (int i = 0; i < 4; i++) {
+        r.point[0] += pesos[i] * controles[i].point[0];
+        r.point[1] += pesos[i] * controles[i].point[1];
+    }
+    return r;
+}
 void subdivide(ponto P0, ponto P1, ponto P2, ponto P3, Pontos *curva_resultado,
                ponto A, ponto B, float t0, float t1, float tolerance, AABB *box) {
     float tmid = (t0 + t1) / 2.0f;
@@ -51,22 +68,9 @@ void subdivide(ponto P0, ponto P1, ponto P2, ponto P3, Pontos *curva_resultado,
 }
 // Unificação das duas funções left/right — lado: 0=esquerda, 1=direita
 static void criar_box_picking(ponto P0, ponto P1, ponto P2, ponto P3,
-                               ponto A, ponto B, float t0, float t1,
-                               float tolerance, AABB *box, int lado) {
-    float tmid = (t0 + t1) / 2.0f;
-    ponto M = calcular_ponto_bspline(P0, P1, P2, P3, tmid);
-    float dist = calcula_dist_ponto_segmento(M, A, B);
-    if (dist < tolerance) {
-        box->x_min = fminf(box->x_min, M.point[0]);
-        box->y_min = fminf(box->y_min, M.point[1]);
-        box->x_max = fmaxf(box->x_max, M.point[0]);
-        box->y_max = fmaxf(box->y_max, M.point[1]);
-    } else {
-        if (lado == 0)
-            criar_box_picking(P0, P1, P2, P3, A, M, t0, tmid, tolerance, box, 0);
-        else
-            criar_box_picking(P0, P1, P2, P3, M, B, tmid, t1, tolerance, box, 1);
-    }
+                               float t0, float t1, AABB *box) {
+    incluir_intervalo_curva_cubica_aabb(box, P0, P1, P2, P3, t0, t1,
+                                        calcular_ponto_bspline, derivada_bspline);
 }
 
 
@@ -80,16 +84,10 @@ void gerar_curva_bspline(ponto P0, ponto P1, ponto P2, ponto P3,
 
     // Inicializa caixas temporárias com os limites dos extremos
     AABB box_esq; reset_box(&box_esq);
-    box_esq.x_min = fminf(A.point[0], M.point[0]);
-    box_esq.y_min = fminf(A.point[1], M.point[1]);
-    box_esq.x_max = fmaxf(A.point[0], M.point[0]);
-    box_esq.y_max = fmaxf(A.point[1], M.point[1]);
+    criar_box_picking(P0, P1, P2, P3, 0.0f, 0.5f, &box_esq);
 
     AABB box_dir; reset_box(&box_dir);
-    box_dir.x_min = fminf(M.point[0], B.point[0]);
-    box_dir.y_min = fminf(M.point[1], B.point[1]);
-    box_dir.x_max = fmaxf(M.point[0], B.point[0]);
-    box_dir.y_max = fmaxf(M.point[1], B.point[1]);
+    criar_box_picking(P0, P1, P2, P3, 0.5f, 1.0f, &box_dir);
 
     // Subdivide as metades direcionando os resultados para as caixas temporárias
     pontos_push(curva_resultado, A);
@@ -132,18 +130,15 @@ static ResultadoPicking subdivide_picking_bspline(
     }
 
     float tmid = (t0 + t1) / 2.0f;
-    ponto A    = calcular_ponto_bspline(P0, P1, P2, P3, t0);
-    ponto M    = calcular_ponto_bspline(P0, P1, P2, P3, tmid);
-    ponto B    = calcular_ponto_bspline(P0, P1, P2, P3, t1);
 
     // Caixa da metade esquerda [t0, tmid]
     AABB box_esq; reset_box(&box_esq);
-    criar_box_picking(P0, P1, P2, P3, A, M, t0, tmid, 0.1f, &box_esq, 0);
+    criar_box_picking(P0, P1, P2, P3, t0, tmid, &box_esq);
     float dist_esq = dist_mouse_aabb(mouse, box_esq);
 
     // Caixa da metade direita [tmid, t1]
     AABB box_dir; reset_box(&box_dir);
-    criar_box_picking(P0, P1, P2, P3, M, B, tmid, t1, 0.1f, &box_dir, 1);
+    criar_box_picking(P0, P1, P2, P3, tmid, t1, &box_dir);
     float dist_dir = dist_mouse_aabb(mouse, box_dir);
 
     ResultadoPicking melhor = sem_resultado;

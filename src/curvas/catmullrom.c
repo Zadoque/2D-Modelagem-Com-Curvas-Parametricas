@@ -25,6 +25,21 @@ ponto calcular_ponto_catmullrom(ponto P0, ponto P1, ponto P2, ponto P3, float t)
     return r;
 }
 
+static ponto derivada_catmullrom(ponto P0, ponto P1, ponto P2, ponto P3, float t) {
+    float vetor_dt[4] = {3.0f*t*t, 2.0f*t, 1.0f, 0.0f};
+    float pesos[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    ponto controles[4] = {P0, P1, P2, P3};
+    ponto r = {{0.0f, 0.0f, 0.0f}};
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++)
+            pesos[i] += vetor_dt[j] * MATRIZ_CATMULLROM[j][i];
+    for (int i = 0; i < 4; i++) {
+        r.point[0] += pesos[i] * controles[i].point[0];
+        r.point[1] += pesos[i] * controles[i].point[1];
+    }
+    return r;
+}
+
 static void subdivide_catmullrom(ponto P0, ponto P1, ponto P2, ponto P3,
                                   Pontos *curva, ponto A, ponto B,
                                   float t0, float t1, float tol, AABB *box) {
@@ -49,16 +64,12 @@ void gerar_curva_catmullrom(ponto P0, ponto P1, ponto P2, ponto P3,
 
     // Inicializa caixas temporárias com os limites dos extremos
     AABB box_esq; reset_box(&box_esq);
-    box_esq.x_min = fminf(A.point[0], M.point[0]);
-    box_esq.y_min = fminf(A.point[1], M.point[1]);
-    box_esq.x_max = fmaxf(A.point[0], M.point[0]);
-    box_esq.y_max = fmaxf(A.point[1], M.point[1]);
+    incluir_intervalo_curva_cubica_aabb(&box_esq, P0, P1, P2, P3, 0.0f, 0.5f,
+                                        calcular_ponto_catmullrom, derivada_catmullrom);
 
     AABB box_dir; reset_box(&box_dir);
-    box_dir.x_min = fminf(M.point[0], B.point[0]);
-    box_dir.y_min = fminf(M.point[1], B.point[1]);
-    box_dir.x_max = fmaxf(M.point[0], B.point[0]);
-    box_dir.y_max = fmaxf(M.point[1], B.point[1]);
+    incluir_intervalo_curva_cubica_aabb(&box_dir, P0, P1, P2, P3, 0.5f, 1.0f,
+                                        calcular_ponto_catmullrom, derivada_catmullrom);
      // Subdivide as metades direcionando os resultados para as caixas temporárias
     pontos_push(curva, A);
     subdivide_catmullrom(P0, P1, P2, P3, curva, A, M, 0.0f, 0.5f, 0.1f, &box_esq);
@@ -83,17 +94,9 @@ void gerar_curva_catmullrom(ponto P0, ponto P1, ponto P2, ponto P3,
 
 
 static void criar_box_picking_c(ponto P0, ponto P1, ponto P2, ponto P3,
-                                  ponto A, ponto B, float t0, float t1,
-                                  float tol, AABB *box, int lado) {
-    float tmid = (t0+t1)/2.0f;
-    ponto M = calcular_ponto_catmullrom(P0,P1,P2,P3, tmid);
-    if (calcula_dist_ponto_segmento(M, A, B) < tol) {
-        box->x_min = fminf(box->x_min, M.point[0]); box->y_min = fminf(box->y_min, M.point[1]);
-        box->x_max = fmaxf(box->x_max, M.point[0]); box->y_max = fmaxf(box->y_max, M.point[1]);
-    } else {
-        if (lado == 0) criar_box_picking_c(P0,P1,P2,P3, A, M, t0, tmid, tol, box, 0);
-        else           criar_box_picking_c(P0,P1,P2,P3, M, B, tmid, t1, tol, box, 1);
-    }
+                                  float t0, float t1, AABB *box) {
+    incluir_intervalo_curva_cubica_aabb(box, P0, P1, P2, P3, t0, t1,
+                                        calcular_ponto_catmullrom, derivada_catmullrom);
 }
 
 static ResultadoPicking subdivide_picking_catmullrom(
@@ -107,11 +110,8 @@ static ResultadoPicking subdivide_picking_catmullrom(
         ResultadoPicking r = { 0, tmid, sqrtf(dx*dx+dy*dy) }; return r;
     }
     float tmid = (t0+t1)/2.0f;
-    ponto A = calcular_ponto_catmullrom(P0,P1,P2,P3, t0);
-    ponto M = calcular_ponto_catmullrom(P0,P1,P2,P3, tmid);
-    ponto B = calcular_ponto_catmullrom(P0,P1,P2,P3, t1);
-    AABB be; reset_box(&be); criar_box_picking_c(P0,P1,P2,P3, A, M, t0, tmid, 0.1f, &be, 0);
-    AABB bd; reset_box(&bd); criar_box_picking_c(P0,P1,P2,P3, M, B, tmid, t1, 0.1f, &bd, 1);
+    AABB be; reset_box(&be); criar_box_picking_c(P0,P1,P2,P3, t0, tmid, &be);
+    AABB bd; reset_box(&bd); criar_box_picking_c(P0,P1,P2,P3, tmid, t1, &bd);
     float de = dist_mouse_aabb(mouse, be), dd = dist_mouse_aabb(mouse, bd);
     ResultadoPicking melhor = sem;
     if (de <= dd) {

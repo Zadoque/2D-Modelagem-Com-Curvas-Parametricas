@@ -12,13 +12,19 @@ int ponto_dentro_aabb(AABB box, float px, float py) {
 
 
 
-void aabb_vec_push(AABB_vec* v, AABB box) {
+int aabb_vec_push(AABB_vec* v, AABB box) {
+    if (v == NULL || v->quantidade < 0 || v->capacidade < 0) return -1;
     if (v->quantidade >= v->capacidade) {
-        v->capacidade = (int)(v->capacidade * 1.5f) + 1;
-        v->dados = realloc(v->dados, v->capacidade * sizeof(AABB));
+        int nova_capacidade = v->capacidade + v->capacidade / 2 + 1;
+        if (nova_capacidade <= v->capacidade) return -1;
+        AABB *novos_dados = realloc(v->dados, (size_t)nova_capacidade * sizeof(AABB));
+        if (novos_dados == NULL) return -1;
+        v->dados = novos_dados;
+        v->capacidade = nova_capacidade;
     }
     v->dados[v->quantidade] = box;
     v->quantidade++;
+    return 0;
 }
 
 

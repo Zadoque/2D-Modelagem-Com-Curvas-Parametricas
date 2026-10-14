@@ -27,6 +27,17 @@ ponto calcular_ponto_bezier(ponto P0, ponto P1, ponto P2, ponto P3, float t) {
     return r;
 }
 
+static ponto derivada_bezier(ponto P0, ponto P1, ponto P2, ponto P3, float t) {
+    float u = 1.0f - t;
+    ponto r = {{0.0f, 0.0f, 0.0f}};
+    for (int eixo = 0; eixo < 2; eixo++) {
+        r.point[eixo] = 3.0f*u*u*(P1.point[eixo] - P0.point[eixo])
+                      + 6.0f*u*t*(P2.point[eixo] - P1.point[eixo])
+                      + 3.0f*t*t*(P3.point[eixo] - P2.point[eixo]);
+    }
+    return r;
+}
+
 static void subdivide_bezier(ponto P0, ponto P1, ponto P2, ponto P3,
                               Pontos *curva, ponto A, ponto B,
                               float t0, float t1, float tol, AABB *box) {
@@ -53,16 +64,12 @@ void gerar_curva_bezier(ponto P0, ponto P1, ponto P2, ponto P3,
 
     // Inicializa caixas temporárias com os limites dos extremos
     AABB box_esq; reset_box(&box_esq);
-    box_esq.x_min = fminf(A.point[0], M.point[0]);
-    box_esq.y_min = fminf(A.point[1], M.point[1]);
-    box_esq.x_max = fmaxf(A.point[0], M.point[0]);
-    box_esq.y_max = fmaxf(A.point[1], M.point[1]);
+    incluir_intervalo_curva_cubica_aabb(&box_esq, P0, P1, P2, P3, 0.0f, 0.5f,
+                                        calcular_ponto_bezier, derivada_bezier);
 
     AABB box_dir; reset_box(&box_dir);
-    box_dir.x_min = fminf(M.point[0], B.point[0]);
-    box_dir.y_min = fminf(M.point[1], B.point[1]);
-    box_dir.x_max = fmaxf(M.point[0], B.point[0]);
-    box_dir.y_max = fmaxf(M.point[1], B.point[1]);
+    incluir_intervalo_curva_cubica_aabb(&box_dir, P0, P1, P2, P3, 0.5f, 1.0f,
+                                        calcular_ponto_bezier, derivada_bezier);
      // Subdivide as metades direcionando os resultados para as caixas temporárias
     pontos_push(curva, A);
     subdivide_bezier(P0, P1, P2, P3, curva, A, M, 0.0f, 0.5f, 0.1f, &box_esq);
@@ -88,23 +95,9 @@ void gerar_curva_bezier(ponto P0, ponto P1, ponto P2, ponto P3,
 
 // Unificação das duas funções left/right — lado: 0=esquerda, 1=direita
 static void criar_box_picking_b(ponto P0, ponto P1, ponto P2, ponto P3,
-                               ponto A, ponto B, float t0, float t1,
-                               float tolerance, AABB *box, int lado) {
-    float tmid = (t0 + t1) / 2.0f;
-    ponto M = calcular_ponto_bezier(P0, P1, P2, P3, tmid);
-    float dist = calcula_dist_ponto_segmento(M, A, B);
-    if (dist < tolerance) {
-        box->x_min = fminf(box->x_min, M.point[0]);
-        box->y_min = fminf(box->y_min, M.point[1]);
-        box->x_max = fmaxf(box->x_max, M.point[0]);
-        box->y_max = fmaxf(box->y_max, M.point[1]);
-    } else {
-        if (lado == 0){
-            criar_box_picking_b(P0, P1, P2, P3, A, M, t0, tmid, tolerance, box, 0);
-        } else {
-            criar_box_picking_b(P0, P1, P2, P3, M, B, tmid, t1, tolerance, box, 1);
-        }
-    }
+                               float t0, float t1, AABB *box) {
+    incluir_intervalo_curva_cubica_aabb(box, P0, P1, P2, P3, t0, t1,
+                                        calcular_ponto_bezier, derivada_bezier);
 }
 
 
@@ -128,18 +121,15 @@ static ResultadoPicking subdivide_picking_bezier(
     }
 
     float tmid = (t0 + t1) / 2.0f;
-    ponto A    = calcular_ponto_bezier(P0, P1, P2, P3, t0);
-    ponto M    = calcular_ponto_bezier(P0, P1, P2, P3, tmid);
-    ponto B    = calcular_ponto_bezier(P0, P1, P2, P3, t1);
 
     // Caixa da metade esquerda [t0, tmid]
     AABB box_esq; reset_box(&box_esq);
-    criar_box_picking_b(P0, P1, P2, P3, A, M, t0, tmid, 0.1f, &box_esq, 0);
+    criar_box_picking_b(P0, P1, P2, P3, t0, tmid, &box_esq);
     float dist_esq = dist_mouse_aabb(mouse, box_esq);
 
     // Caixa da metade direita [tmid, t1]
     AABB box_dir; reset_box(&box_dir);
-    criar_box_picking_b(P0, P1, P2, P3, M, B, tmid, t1, 0.1f, &box_dir, 1);
+    criar_box_picking_b(P0, P1, P2, P3, tmid, t1, &box_dir);
     float dist_dir = dist_mouse_aabb(mouse, box_dir);
 
     ResultadoPicking melhor = sem_resultado;

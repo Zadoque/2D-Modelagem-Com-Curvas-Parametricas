@@ -41,6 +41,25 @@ static ponto hermite_eval(ponto P0, ponto P1, ponto P2, ponto P3, float t) {
     return calcular_ponto_hermite(P1, P2, T1, T2, t);
 }
 
+static ponto derivada_hermite(ponto P0, ponto P1, ponto P2, ponto P3, float t) {
+    ponto T1, T2;
+    calcular_tangentes_hermite(P0, P1, P2, P3, &T1, &T2);
+    float t2 = t * t;
+    float pesos[4] = {
+        6.0f*t2 - 6.0f*t,
+       -6.0f*t2 + 6.0f*t,
+        3.0f*t2 - 4.0f*t + 1.0f,
+        3.0f*t2 - 2.0f*t
+    };
+    ponto controles[4] = {P1, P2, T1, T2};
+    ponto r = {{0.0f, 0.0f, 0.0f}};
+    for (int i = 0; i < 4; i++) {
+        r.point[0] += pesos[i] * controles[i].point[0];
+        r.point[1] += pesos[i] * controles[i].point[1];
+    }
+    return r;
+}
+
 static void subdivide_hermite(ponto P0, ponto P1, ponto P2, ponto P3,
                                Pontos *curva, ponto A, ponto B,
                                float t0, float t1, float tol, AABB *box) {
@@ -59,26 +78,22 @@ static void subdivide_hermite(ponto P0, ponto P1, ponto P2, ponto P3,
 void gerar_curva_hermite(ponto P0, ponto P1, ponto P2, ponto P3,
                           Pontos *curva, AABB *box) {
     curva->quantidade_atual = 0;
-    ponto A = calcular_ponto_hermite(P0, P1, P2, P3, 0.0f);
-    ponto M = calcular_ponto_hermite(P0, P1, P2, P3, 0.5f);
-    ponto B = calcular_ponto_hermite(P0, P1, P2, P3, 1.0f);
+    ponto A = hermite_eval(P0, P1, P2, P3, 0.0f);
+    ponto M = hermite_eval(P0, P1, P2, P3, 0.5f);
+    ponto B = hermite_eval(P0, P1, P2, P3, 1.0f);
 
     // Inicializa caixas temporárias com os limites dos extremos
     AABB box_esq; reset_box(&box_esq);
-    box_esq.x_min = fminf(A.point[0], M.point[0]);
-    box_esq.y_min = fminf(A.point[1], M.point[1]);
-    box_esq.x_max = fmaxf(A.point[0], M.point[0]);
-    box_esq.y_max = fmaxf(A.point[1], M.point[1]);
+    incluir_intervalo_curva_cubica_aabb(&box_esq, P0, P1, P2, P3, 0.0f, 0.5f,
+                                        hermite_eval, derivada_hermite);
 
     AABB box_dir; reset_box(&box_dir);
-    box_dir.x_min = fminf(M.point[0], B.point[0]);
-    box_dir.y_min = fminf(M.point[1], B.point[1]);
-    box_dir.x_max = fmaxf(M.point[0], B.point[0]);
-    box_dir.y_max = fmaxf(M.point[1], B.point[1]);
+    incluir_intervalo_curva_cubica_aabb(&box_dir, P0, P1, P2, P3, 0.5f, 1.0f,
+                                        hermite_eval, derivada_hermite);
      // Subdivide as metades direcionando os resultados para as caixas temporárias
     pontos_push(curva, A);
     subdivide_hermite(P0, P1, P2, P3, curva, A, M, 0.0f, 0.5f, 0.1f, &box_esq);
-    //pontos_push(curva, M);
+    pontos_push(curva, M);
     subdivide_hermite(P0, P1, P2, P3, curva, M, B, 0.5f, 1.0f, 0.1f, &box_dir);
     pontos_push(curva, B);
 
@@ -99,17 +114,9 @@ void gerar_curva_hermite(ponto P0, ponto P1, ponto P2, ponto P3,
 
 
 static void criar_box_picking_h(ponto P0, ponto P1, ponto P2, ponto P3,
-                                  ponto A, ponto B, float t0, float t1,
-                                  float tol, AABB *box, int lado) {
-    float tmid = (t0+t1)/2.0f;
-    ponto M = hermite_eval(P0,P1,P2,P3, tmid);
-    if (calcula_dist_ponto_segmento(M, A, B) < tol) {
-        box->x_min = fminf(box->x_min, M.point[0]); box->y_min = fminf(box->y_min, M.point[1]);
-        box->x_max = fmaxf(box->x_max, M.point[0]); box->y_max = fmaxf(box->y_max, M.point[1]);
-    } else {
-        if (lado == 0) criar_box_picking_h(P0,P1,P2,P3, A, M, t0, tmid, tol, box, 0);
-        else           criar_box_picking_h(P0,P1,P2,P3, M, B, tmid, t1, tol, box, 1);
-    }
+                                  float t0, float t1, AABB *box) {
+    incluir_intervalo_curva_cubica_aabb(box, P0, P1, P2, P3, t0, t1,
+                                        hermite_eval, derivada_hermite);
 }
 
 static ResultadoPicking subdivide_picking_hermite(
@@ -123,11 +130,8 @@ static ResultadoPicking subdivide_picking_hermite(
         ResultadoPicking r = { 0, tmid, sqrtf(dx*dx+dy*dy) }; return r;
     }
     float tmid = (t0+t1)/2.0f;
-    ponto A = hermite_eval(P0,P1,P2,P3, t0);
-    ponto M = hermite_eval(P0,P1,P2,P3, tmid);
-    ponto B = hermite_eval(P0,P1,P2,P3, t1);
-    AABB be; reset_box(&be); criar_box_picking_h(P0,P1,P2,P3, A, M, t0, tmid, 0.1f, &be, 0);
-    AABB bd; reset_box(&bd); criar_box_picking_h(P0,P1,P2,P3, M, B, tmid, t1, 0.1f, &bd, 1);
+    AABB be; reset_box(&be); criar_box_picking_h(P0,P1,P2,P3, t0, tmid, &be);
+    AABB bd; reset_box(&bd); criar_box_picking_h(P0,P1,P2,P3, tmid, t1, &bd);
     float de = dist_mouse_aabb(mouse, be), dd = dist_mouse_aabb(mouse, bd);
     ResultadoPicking melhor = sem;
     if (de <= dd) {

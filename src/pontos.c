@@ -2,36 +2,50 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <limits.h>
+#include <stdint.h>
 
 
 void pontos_init(Pontos *v, size_t cap0) {
+  size_t capacidade = cap0 ? cap0 : 20;
+  if (capacidade > INT_MAX || capacidade > SIZE_MAX / sizeof(ponto)) {
+    fprintf(stderr, "Erro: capacidade inicial de pontos inválida\n");
+    exit(1);
+  }
   v->quantidade_atual = 0;
-  v->quantidade_max = cap0 ? cap0 : 20;
-  v->data = (ponto *)malloc(v->quantidade_max * sizeof(ponto));
+  v->quantidade_max = (int)capacidade;
+  v->data = (ponto *)malloc(capacidade * sizeof(ponto));
   if (!v->data) {
     printf("Erro: falha ao alocar memória para pontos\n");
     exit(1);
   }
 }
 
-static void pontos_ensure(Pontos *v, size_t needed) {
-  if (needed <= v->quantidade_max) return;
+static int pontos_ensure(Pontos *v, size_t needed) {
+  if (needed <= (size_t)v->quantidade_max) return 0;
+  if (needed > INT_MAX) return -1;
   
-  size_t newcap = v->quantidade_max + v->quantidade_max / 2;
+  size_t newcap = (size_t)v->quantidade_max + (size_t)v->quantidade_max / 2;
   if (newcap < needed) newcap = needed;
+  if (newcap > INT_MAX || newcap > SIZE_MAX / sizeof(ponto)) return -1;
   
   ponto *tmp = (ponto *)realloc(v->data, newcap * sizeof(ponto));
   if (!tmp) {
-    printf("Erro: falha ao realocar memória\n");
-    return;
+    fprintf(stderr, "Erro: falha ao realocar memória para pontos\n");
+    return -1;
   }
   v->data = tmp;
-  v->quantidade_max = newcap;
+  v->quantidade_max = (int)newcap;
+  return 0;
 }
 
-void pontos_push(Pontos *v, ponto p) {
-  pontos_ensure(v, v->quantidade_atual + 1);
+int pontos_push(Pontos *v, ponto p) {
+  if (!v || v->quantidade_atual < 0 ||
+      pontos_ensure(v, (size_t)v->quantidade_atual + 1) != 0) {
+    return -1;
+  }
   v->data[v->quantidade_atual++] = p;
+  return 0;
 }
 
 void pontos_free(Pontos *v) {

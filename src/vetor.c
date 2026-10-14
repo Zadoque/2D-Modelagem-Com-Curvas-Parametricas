@@ -1,5 +1,5 @@
 #include "./../includes/vetor.h"
-#include <stdlib.h>;
+#include <stdlib.h>
 /* Capacidade mínima para evitar realocações excessivas */
 #define VEC_MIN_CAP 4
 
@@ -16,9 +16,9 @@ void vec_free(vec *v) {
     v->quantidade_max = 0;
 }
 
-void vec_ensure(vec *v) {
+int vec_ensure(vec *v) {
     if (v->quantidade_atual < v->quantidade_max) {
-        return;
+        return 0;
     }
 
     int nova_cap;
@@ -35,17 +35,17 @@ void vec_ensure(vec *v) {
     float *novo = realloc(v->vector, nova_cap * sizeof(float));
     if (novo == NULL) {
         /* Falha de alocação: mantém estado anterior */
-        return;
+        return -1;
     }
 
     v->vector = novo;
     v->quantidade_max = nova_cap;
+    return 0;
 }
 
 int vec_push(float x, vec *v) {
-    vec_ensure(v);
-
-    if (v->vector == NULL) {
+    if (vec_ensure(v) != 0 || v->vector == NULL ||
+        v->quantidade_atual >= v->quantidade_max) {
         return -1;
     }
 

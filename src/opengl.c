@@ -27,7 +27,6 @@ void initGL() {
 
   // Inicializar estrutura para curva
   pontos_init(&g_curva_atual, 100);
-  pontos_init(&g_clicks, 20);
   aabb_vec_init(&vetor_boxes, 20);
   selecao_ponto.selecionado = 0;
   selecao_ponto.indice = 0;
@@ -72,6 +71,7 @@ void desenhar_arvore_aabb(AABBTREE* raiz) {
 void gerar_curva_selecionada() {
   if (g_clicks.quantidade_atual < 4) return;
   if (precisa_refazer_curva == 0) return;
+  performance_iniciar_medicao();
   int poligono = (estado_atual.poligono == MODO_POLIGONO_FECHADO) ? 1 : 0;
   ponto P0, P1, P2, P3;
   estado_atual.qtd_nuvem_pontos_number = 0;
@@ -125,7 +125,7 @@ void gerar_curva_selecionada() {
         P2 = g_clicks.data[(g_clicks.quantidade_atual - 1) % g_clicks.quantidade_atual];
         P3 = g_clicks.data[0];
         AABB box_b;
-        box_b.segmento_indice = vetor_boxes.quantidade;
+        box_b.segmento_indice = g_clicks.quantidade_atual - 3;
         gerar_curva_bezier(P0, P1, P2, P3, &g_curva_atual, &box_b);
         aabb_vec_push(&vetor_boxes, box_b);
         estado_atual.qtd_nuvem_pontos_number += g_curva_atual.quantidade_atual;
@@ -196,7 +196,6 @@ void gerar_curva_selecionada() {
     }
     //desenhar_arvore_aabb(arvore_boxes);
     //desenhar_aabbs(&vetor_boxes); //apenas para debug
-    performance_benchmark_executar(100);
   sprintf(estado_atual.qtd_nuvem_pontos, "%d", estado_atual.qtd_nuvem_pontos_number);
 }
 void desenhar_aabbs(AABB_vec* v) {

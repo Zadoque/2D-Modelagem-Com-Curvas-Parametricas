@@ -35,7 +35,7 @@ typedef struct {
 
 // Funções relacionadas a Pontos
 void pontos_init(Pontos *v, size_t cap0);
-void pontos_push(Pontos *v, ponto p);
+int pontos_push(Pontos *v, ponto p);
 void pontos_free(Pontos *v);
 void esvazia_points(Pontos *v);
 double raiz_quadrada_newton(double n);

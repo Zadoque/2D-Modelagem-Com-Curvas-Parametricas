@@ -41,6 +41,8 @@ typedef struct {
 
 extern MetricasPerformance metricas_performance;
 
+/* Inicia uma nova medição da curva exibida, sem carregar o frame anterior. */
+void performance_iniciar_medicao(void);
 void performance_benchmark_executar(int n_execucoes);
 
 #endif /* PERFORMANCE_BENCHMARK_H */

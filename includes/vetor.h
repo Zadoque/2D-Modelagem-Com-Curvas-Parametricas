@@ -37,7 +37,7 @@ int vec_push(float x, vec *v);
  * Verifica se há capacidade disponível.
  * Se quantidade_atual == quantidade_max, realoca com fator 1.5x.
  */
-void vec_ensure(vec *v);
+int vec_ensure(vec *v);
 
 /*
  * Reduz a capacidade máxima se houver folga excessiva

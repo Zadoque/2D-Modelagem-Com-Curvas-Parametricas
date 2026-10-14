@@ -30,6 +30,18 @@ static __thread double inicio_geracao_bspline;
 static __thread double inicio_geracao_catmullrom;
 static __thread double inicio_desenho;
 
+void __attribute__((no_instrument_function)) performance_iniciar_medicao(void) {
+  metricas_performance.tempo_geracao_ms = 0.0;
+  metricas_performance.tempo_desenho_ms = 0.0;
+  metricas_performance.pontos_gerados = 0;
+
+  /* Estes campos representam estado instantâneo, não acumuladores. */
+  metricas_performance.buffer_curva_uso = 0;
+  metricas_performance.buffer_curva_capacidade = g_curva_atual.quantidade_max;
+  metricas_performance.buffer_controle_uso = g_clicks.quantidade_atual;
+  metricas_performance.buffer_controle_capacidade = g_clicks.quantidade_max;
+}
+
 void __attribute__((no_instrument_function))
 __cyg_profile_func_enter(void *func, void *caller) {
   (void)caller;
@@ -44,11 +56,6 @@ void __attribute__((no_instrument_function))
 __cyg_profile_func_exit(void *func, void *caller) {
   (void)caller;
 
-  /* BUGFIX: antes o código sempre lia `inicio_geracao_hermite`,
-   * independentemente de qual curva de fato terminou de gerar. Isso fazia
-   * o tempo_geracao_ms virar lixo (podia até ficar negativo) sempre que a
-   * curva ativa não fosse a Hermite, e é uma das causas da inconsistência
-   * relatada. Agora cada curva usa o seu próprio timestamp de início. */
   if (func == (void *)&gerar_curva_hermite ||
       func == (void *)&gerar_curva_bezier ||
       func == (void *)&gerar_curva_bspline ||
@@ -59,6 +66,8 @@ __cyg_profile_func_exit(void *func, void *caller) {
     else if (func == (void *)&gerar_curva_bspline) inicio = inicio_geracao_bspline;
     else inicio = inicio_geracao_catmullrom;
 
+    /* Soma apenas os segmentos da reconstrução atual. O início de cada
+     * reconstrução chama performance_iniciar_medicao() e zera o frame anterior. */
     metricas_performance.tempo_geracao_ms += agora_ms() - inicio;
     metricas_performance.pontos_gerados += g_curva_atual.quantidade_atual;
   } else if (func == (void *)&desenhar_curva_atual) {
@@ -82,26 +91,9 @@ __cyg_profile_func_exit(void *func, void *caller) {
 }
 
 /* =========================================================================
- * BENCHMARK DETERMINÍSTICO (nova seção)
+ * BENCHMARK DETERMINÍSTICO
  * =========================================================================
- * Por que a instrumentação acima não serve como "benchmark":
- *
- * 1) `pontos_gerados += ...` é incrementado a cada chamada real de
- *    gerar_curva_* disparada pela interação do mouse/redraw do OpenGL.
- *    Como o programa fica rodando indefinidamente no glutMainLoop, usar
- *    "+=" faz esse contador crescer sem limite e nunca refletir "quantos
- *    pontos tem a curva agora" — só reflete "quantas vezes já gerei uma
- *    curva desde que o programa abriu".
- *
- * 2) Trocar para "=" resolve o crescimento infinito, mas passa a mostrar
- *    apenas o resultado da ÚLTIMA curva desenhada antes do redraw — e
- *    qual curva foi essa (e quantos segmentos ela tem) depende de quantos
- *    pontos de controle o usuário já clicou na tela. Ou seja, não é
- *    aleatório de verdade, é não-determinístico porque está acoplado ao
- *    estado da UI, não a uma carga de teste fixa.
- *
- * A solução é não usar esse gancho de instrumentação (pensado para
- * profiling ao vivo) como benchmark. Abaixo está uma rotina isolada, que:
+ * A rotina abaixo permanece isolada da medição da interface e:
  *   - usa pontos de controle FIXOS (não vem de clique de mouse);
  *   - roda um número FIXO e conhecido de execuções (n_execucoes);
  *   - descarta um "aquecimento" (warmup) antes de medir, evitando ruído
