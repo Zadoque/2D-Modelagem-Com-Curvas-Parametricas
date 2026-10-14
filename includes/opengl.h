@@ -6,6 +6,7 @@
 #include "menu.h"
 #include "aabb.h" 
 #include "performance.h"
+#include "geometria_curvas.h"
 // Incluir todas as curvas
 #include "curvas/hermite.h"
 #include "curvas/bezier.h"

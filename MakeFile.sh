@@ -28,6 +28,7 @@ SRC_FILES=(
   src/main.c
   src/pontos.c
   src/opengl.c
+  src/geometria_curvas.c
   src/performance.c
   src/menu.c
   src/matriz.c

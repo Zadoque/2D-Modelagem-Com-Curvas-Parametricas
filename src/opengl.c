@@ -17,6 +17,7 @@ ponto centro;
 int precisa_refazer_curva = 0;
 AABB_vec vetor_boxes;
 AABBTREE *arvore_boxes = NULL;
+static GeometriaCurvas geometria_curva;
 // Configurações visuais
 static float cor_fundo[3] = {0.2f, 0.3f, 0.4f};
 
@@ -27,6 +28,7 @@ void initGL() {
 
   // Inicializar estrutura para curva
   pontos_init(&g_curva_atual, 100);
+  geometria_curvas_init(&geometria_curva);
   aabb_vec_init(&vetor_boxes, 20);
   selecao_ponto.selecionado = 0;
   selecao_ponto.indice = 0;
@@ -69,134 +71,17 @@ void desenhar_arvore_aabb(AABBTREE* raiz) {
     glLineWidth(1.0f);
 }
 void gerar_curva_selecionada() {
-  if (g_clicks.quantidade_atual < 4) return;
-  if (precisa_refazer_curva == 0) return;
+  if (!precisa_refazer_curva) return;
   performance_iniciar_medicao();
-  int poligono = (estado_atual.poligono == MODO_POLIGONO_FECHADO) ? 1 : 0;
-  ponto P0, P1, P2, P3;
-  estado_atual.qtd_nuvem_pontos_number = 0;
-  switch (estado_atual.curva) {
-   case MODO_CURVA_HERMITE:
-    vetor_boxes.quantidade = 0;
-    for (int i = 0; i <= g_clicks.quantidade_atual - 4; i++) {
-      P0 = g_clicks.data[i];
-      P1 = g_clicks.data[i + 1];
-      P2 = g_clicks.data[i + 2];
-      P3 = g_clicks.data[i + 3];
-      AABB box_h;
-      box_h.segmento_indice = i;
-      gerar_curva_hermite(P0, P1, P2, P3, &g_curva_atual, &box_h);
-      aabb_vec_push(&vetor_boxes, box_h);
-      estado_atual.qtd_nuvem_pontos_number += g_curva_atual.quantidade_atual;
-      desenhar_curva_atual();
-    }
-    if (poligono) {
-      for (int i = 0; i < 3; i++) {
-        P0 = g_clicks.data[(g_clicks.quantidade_atual - 3 + i) % g_clicks.quantidade_atual];
-        P1 = g_clicks.data[(g_clicks.quantidade_atual - 2 + i) % g_clicks.quantidade_atual];
-        P2 = g_clicks.data[(g_clicks.quantidade_atual - 1 + i) % g_clicks.quantidade_atual];
-        P3 = g_clicks.data[(g_clicks.quantidade_atual     + i) % g_clicks.quantidade_atual];
-        AABB box_h;
-        box_h.segmento_indice = vetor_boxes.quantidade;
-        gerar_curva_hermite(P0, P1, P2, P3, &g_curva_atual, &box_h);
-        aabb_vec_push(&vetor_boxes, box_h);
-        estado_atual.qtd_nuvem_pontos_number += g_curva_atual.quantidade_atual;
-        desenhar_curva_atual();
-      }
-    }
-    break;
-    case MODO_CURVA_BEZIER:
-      vetor_boxes.quantidade = 0;
-      for (int i = 0; i <= g_clicks.quantidade_atual - 4; i += 3) {
-        P0 = g_clicks.data[i];
-        P1 = g_clicks.data[i + 1];
-        P2 = g_clicks.data[i + 2];
-        P3 = g_clicks.data[i + 3];
-        AABB box_b;
-        box_b.segmento_indice = i;
-        gerar_curva_bezier(P0, P1, P2, P3, &g_curva_atual, &box_b);
-        aabb_vec_push(&vetor_boxes, box_b);
-        estado_atual.qtd_nuvem_pontos_number += g_curva_atual.quantidade_atual;
-        desenhar_curva_atual();
-      }
-      if (poligono && g_clicks.quantidade_atual % 3 == 0) {
-        P0 = g_clicks.data[(g_clicks.quantidade_atual - 3) % g_clicks.quantidade_atual];
-        P1 = g_clicks.data[(g_clicks.quantidade_atual - 2) % g_clicks.quantidade_atual];
-        P2 = g_clicks.data[(g_clicks.quantidade_atual - 1) % g_clicks.quantidade_atual];
-        P3 = g_clicks.data[0];
-        AABB box_b;
-        box_b.segmento_indice = g_clicks.quantidade_atual - 3;
-        gerar_curva_bezier(P0, P1, P2, P3, &g_curva_atual, &box_b);
-        aabb_vec_push(&vetor_boxes, box_b);
-        estado_atual.qtd_nuvem_pontos_number += g_curva_atual.quantidade_atual;
-        desenhar_curva_atual();
-      }
-    break;
-    case MODO_CURVA_BSPLINE:
-
-    glColor3f(1.0f, 0.5f, 0.0f); // Laranja
-    AABB box;
-    vetor_boxes.quantidade = 0;
-    for(int i = 0; i <= g_clicks.quantidade_atual - 4; i++){
-      P0 = g_clicks.data[i];
-      P1 =  g_clicks.data[i + 1];
-      P2 =  g_clicks.data[i + 2];
-      P3 =  g_clicks.data[i + 3];
-      box.segmento_indice = i;
-      gerar_curva_bspline(P0, P1, P2, P3, &g_curva_atual, &box);
-      aabb_vec_push(&vetor_boxes, box);
-      estado_atual.qtd_nuvem_pontos_number += g_curva_atual.quantidade_atual;
-      desenhar_curva_atual();
-    }
-    if (poligono) {
-      for (int i = 0; i < 3; i++) {
-        P0 = g_clicks.data[(g_clicks.quantidade_atual - 3 + i) % g_clicks.quantidade_atual];
-        P1 = g_clicks.data[(g_clicks.quantidade_atual - 2 + i) % g_clicks.quantidade_atual];
-        P2 = g_clicks.data[(g_clicks.quantidade_atual - 1 + i) % g_clicks.quantidade_atual];
-        P3 = g_clicks.data[(g_clicks.quantidade_atual + i)     % g_clicks.quantidade_atual];
-        box.segmento_indice = vetor_boxes.quantidade;
-        gerar_curva_bspline(P0, P1, P2, P3, &g_curva_atual, &box);
-        aabb_vec_push(&vetor_boxes, box);
-        estado_atual.qtd_nuvem_pontos_number += g_curva_atual.quantidade_atual;
-        desenhar_curva_atual();
-      }
-    }
-    //desenhar_arvore_aabb(arvore_boxes);
-    //Não chamo a função para transformar em árvore aqui, apenas quando os pontos de controle mudarem e tiver a soltura do mouse
-    break;
-    case MODO_CURVA_CATMULLROM:
-      vetor_boxes.quantidade = 0;
-      for (int i = 0; i <= g_clicks.quantidade_atual - 4; i++) {
-        P0 = g_clicks.data[i];
-        P1 = g_clicks.data[i + 1];
-        P2 = g_clicks.data[i + 2];
-        P3 = g_clicks.data[i + 3];
-        AABB box_c;
-        box_c.segmento_indice = i;
-        gerar_curva_catmullrom(P0, P1, P2, P3, &g_curva_atual, &box_c);
-        aabb_vec_push(&vetor_boxes, box_c);
-        estado_atual.qtd_nuvem_pontos_number += g_curva_atual.quantidade_atual;
-        desenhar_curva_atual();
-      }
-      if (poligono) {
-        for (int i = 0; i < 3; i++) {
-          P0 = g_clicks.data[(g_clicks.quantidade_atual - 3 + i) % g_clicks.quantidade_atual];
-          P1 = g_clicks.data[(g_clicks.quantidade_atual - 2 + i) % g_clicks.quantidade_atual];
-          P2 = g_clicks.data[(g_clicks.quantidade_atual - 1 + i) % g_clicks.quantidade_atual];
-          P3 = g_clicks.data[(g_clicks.quantidade_atual     + i) % g_clicks.quantidade_atual];
-          AABB box_c;
-          box_c.segmento_indice = vetor_boxes.quantidade;
-          gerar_curva_catmullrom(P0, P1, P2, P3, &g_curva_atual, &box_c);
-          aabb_vec_push(&vetor_boxes, box_c);
-          estado_atual.qtd_nuvem_pontos_number += g_curva_atual.quantidade_atual;
-          desenhar_curva_atual();
-        }
-      }
-      break;
-    }
-    //desenhar_arvore_aabb(arvore_boxes);
-    //desenhar_aabbs(&vetor_boxes); //apenas para debug
+  int fechado = estado_atual.poligono == MODO_POLIGONO_FECHADO;
+  if (geometria_curvas_atualizar(&geometria_curva, &g_curva_atual,
+                                 &vetor_boxes, &g_clicks,
+                                 estado_atual.curva, fechado) != 0) {
+    fprintf(stderr, "Erro ao atualizar geometria da curva\n");
+  }
+  estado_atual.qtd_nuvem_pontos_number = geometria_curva.vertices.quantidade_atual;
   sprintf(estado_atual.qtd_nuvem_pontos, "%d", estado_atual.qtd_nuvem_pontos_number);
+  precisa_refazer_curva = 0;
 }
 void desenhar_aabbs(AABB_vec* v) {
     if (v == NULL || v->quantidade == 0) return;
@@ -226,11 +111,16 @@ void desenhar_aabbs(AABB_vec* v) {
 }
 void desenhar_curva_atual() {
   glLineWidth(0.1f);
-  glBegin(GL_LINE_STRIP);
-  for (int i = 0; i < g_curva_atual.quantidade_atual; i++) {
-    glVertex2f(g_curva_atual.data[i].point[0], g_curva_atual.data[i].point[1]);
+  for (int faixa = 0; faixa < geometria_curva.quantidade_faixas; faixa++) {
+    int inicio = geometria_curva.faixas[faixa].inicio;
+    int fim = inicio + geometria_curva.faixas[faixa].quantidade;
+    glBegin(GL_LINE_STRIP);
+    for (int i = inicio; i < fim; i++) {
+      glVertex2f(geometria_curva.vertices.data[i].point[0],
+                 geometria_curva.vertices.data[i].point[1]);
+    }
+    glEnd();
   }
-  glEnd();
 }
 
 // Suas funções existentes...
@@ -312,6 +202,7 @@ void desenhar_conteudo_principal() {
 
   desenhar_centro_poligono();
   gerar_curva_selecionada();
+  desenhar_curva_atual();
 }
 
 void display() {
@@ -624,6 +515,9 @@ void onMouse(int button, int state, int x, int y) {
         processar_clique_menu(x - largura_desenho, y);
       }
     } else {
+      /* A geometria fica atualizada durante o arrasto; a árvore, usada apenas
+         por picking, continua sendo reconstruída somente ao soltar o mouse. */
+      gerar_curva_selecionada();
       // Libera árvore anterior antes de recriar
       aabb_tree_free(arvore_boxes);
       printf("a quantidade de caixas é: %d", vetor_boxes.quantidade);
