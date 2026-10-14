@@ -91,7 +91,7 @@ void atualizar_dimensoes_menu() {
     botoes.botoes1[4].y = y_inicio_grupo1 + 4 * (altura_botao + espacamento);
     botoes.botoes1[4].largura = largura_botao;
     botoes.botoes1[4].altura = altura_botao;
-    botoes.botoes1[4].acao = MODO_SELEICIONAR_CURVA;
+    botoes.botoes1[4].acao = MODO_SELECIONAR_CURVA;
 
     // === BOTÕES DE POLÍGONO (Grupo 2) ===
     int y_inicio_grupo2 = y_inicio_grupo1 + 5 * (altura_botao + espacamento) + altura_janela * 0.03;

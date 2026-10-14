@@ -305,7 +305,7 @@ void processar_clique_desenho(int x, int y) {
         }
       }
     break;
-  case MODO_SELEICIONAR_CURVA:
+  case MODO_SELECIONAR_CURVA:
     switch (estado_atual.curva) {
       case MODO_CURVA_BSPLINE: {
         ResultadoPicking resultado = picking_bspline(arvore_boxes, &g_clicks, mouse, 5.0f, FLT_MAX);
