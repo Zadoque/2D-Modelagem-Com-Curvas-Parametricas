@@ -1,6 +1,18 @@
 #include "../includes/transformacoes.h"
 #include <math.h>
 
+#define FATOR_CISALHAMENTO_MAXIMO 10.0f
+
+static float limitar_fator_cisalhamento(float fator){
+  if(fator > FATOR_CISALHAMENTO_MAXIMO){
+    return FATOR_CISALHAMENTO_MAXIMO;
+  }
+  if(fator < -FATOR_CISALHAMENTO_MAXIMO){
+    return -FATOR_CISALHAMENTO_MAXIMO;
+  }
+  return fator;
+}
+
 static void aplicar(Pontos *p, Matriz3 m){
   for(int i = 0; i < p->quantidade_atual; i++){
     float r[3];
@@ -69,7 +81,7 @@ void cisalhar_x_com_mouse(Pontos *p, ponto *c, ponto mouse, int i){
   }
   float vx = p->data[i].point[0] - c->point[0], vy = p->data[i].point[1] - c->point[1];
   float s = fabsf(vy) > 1e-6f ? (mouse.point[0] - c->point[0] - vx) / vy : 0;
-  aplicar(p, ao_redor(*c, matriz3_cisalhamento_x(s)));
+  aplicar(p, ao_redor(*c, matriz3_cisalhamento_x(limitar_fator_cisalhamento(s))));
 }
 void cisalhar_y_com_mouse(Pontos *p, ponto *c, ponto mouse, int i){
   if(!indice_valido(p, i) || !c){
@@ -77,17 +89,20 @@ void cisalhar_y_com_mouse(Pontos *p, ponto *c, ponto mouse, int i){
   }
   float vx = p->data[i].point[0] - c->point[0], vy = p->data[i].point[1] - c->point[1];
   float s = fabsf(vx) > 1e-6f ? (mouse.point[1] - c->point[1] - vy) / vx : 0;
-  aplicar(p, ao_redor(*c, matriz3_cisalhamento_y(s)));
+  aplicar(p, ao_redor(*c, matriz3_cisalhamento_y(limitar_fator_cisalhamento(s))));
 }
 void cisalhar_com_mouse(Pontos *p, ponto *c, ponto mouse, int i){
   if(!indice_valido(p, i) || !c){
     return;
   }
   float vx = p->data[i].point[0] - c->point[0], vy = p->data[i].point[1] - c->point[1];
-  float sx = fabsf(vy) > 1e-6f ? (mouse.point[0] - c->point[0] - vx) / vy : 0;
-  float sy = fabsf(vx) > 1e-6f ? (mouse.point[1] - c->point[1] - vy) / vx : 0;
-  Matriz3 sh = matriz3_multiplicar(matriz3_cisalhamento_x(sx), matriz3_cisalhamento_y(sy));
-  aplicar(p, ao_redor(*c, sh));
+  float dx = mouse.point[0] - p->data[i].point[0];
+  float dy = mouse.point[1] - p->data[i].point[1];
+  if(fabsf(dx) >= fabsf(dy) && fabsf(vy) > 1e-6f){
+    cisalhar_x_com_mouse(p, c, mouse, i);
+  } else if(fabsf(vx) > 1e-6f){
+    cisalhar_y_com_mouse(p, c, mouse, i);
+  }
 }
 void aumentar_escala(Pontos *p, ponto c){
   if(p){

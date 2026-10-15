@@ -68,7 +68,7 @@ static int consumir_no(size_t *restantes){
 
 static void subdividir_geracao(const CurvaCubicaOps *ops, ponto P0, ponto P1, ponto P2, ponto P3,
                                Pontos *resultado, ponto A, ponto B, float t0, float t1,
-                               unsigned profundidade, size_t *nos){
+                               unsigned profundidade, size_t *nos, int incluir_final){
   float tmid = t0 + (t1 - t0) * 0.5f;
   nos_ultima_medicao++;
   ponto M = ops->avaliar(P0, P1, P2, P3, tmid);
@@ -77,17 +77,18 @@ static void subdividir_geracao(const CurvaCubicaOps *ops, ponto P0, ponto P1, po
               !isfinite(desvio) || desvio <= config_atual.tolerancia_geometrica ||
               !consumir_no(nos);
   if(parar){
-    if(isfinite(B.point[0]) && isfinite(B.point[1])){
+    if(incluir_final && isfinite(B.point[0]) && isfinite(B.point[1])){
       pontos_push(resultado, B);
     }
     return;
   }
-  subdividir_geracao(ops, P0, P1, P2, P3, resultado, A, M, t0, tmid, profundidade + 1, nos);
-  subdividir_geracao(ops, P0, P1, P2, P3, resultado, M, B, tmid, t1, profundidade + 1, nos);
+  subdividir_geracao(ops, P0, P1, P2, P3, resultado, A, M, t0, tmid, profundidade + 1, nos, 1);
+  subdividir_geracao(ops, P0, P1, P2, P3, resultado, M, B, tmid, t1, profundidade + 1, nos,
+                     incluir_final);
 }
 
 void gerar_segmento_curva_cubica(const CurvaCubicaOps *ops, ponto P0, ponto P1, ponto P2, ponto P3,
-                                 Pontos *resultado, AABB *box){
+                                 Pontos *resultado, AABB *box, ponto *ponto_final){
   resultado->quantidade_atual = 0;
   ponto A = ops->avaliar(P0, P1, P2, P3, 0.0f);
   ponto M = ops->avaliar(P0, P1, P2, P3, 0.5f);
@@ -101,8 +102,11 @@ void gerar_segmento_curva_cubica(const CurvaCubicaOps *ops, ponto P0, ponto P1, 
                                       ops->derivar);
   size_t nos = config_atual.max_nos_geracao;
   pontos_push(resultado, A);
-  subdividir_geracao(ops, P0, P1, P2, P3, resultado, A, M, 0, 0.5f, 0, &nos);
-  subdividir_geracao(ops, P0, P1, P2, P3, resultado, M, B, 0.5f, 1, 0, &nos);
+  subdividir_geracao(ops, P0, P1, P2, P3, resultado, A, M, 0, 0.5f, 0, &nos, 1);
+  subdividir_geracao(ops, P0, P1, P2, P3, resultado, M, B, 0.5f, 1, 0, &nos, 0);
+  if(ponto_final){
+    *ponto_final = B;
+  }
   box->esq_x_min = esquerda.x_min;
   box->esq_y_min = esquerda.y_min;
   box->esq_x_max = esquerda.x_max;
@@ -213,9 +217,20 @@ ResultadoPicking picking_curva_cubica(const CurvaCubicaOps *ops, AABBTREE *arvor
 
 void arrastar_segmento_curva_cubica(const CurvaCubicaOps *ops, Pontos *controles, int segmento,
                                     float t, ponto mouse){
-  if(!controles || controles->quantidade_atual < 4){
+  const float pesos_unitarios[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+  arrastar_segmento_curva_cubica_ponderado(ops, controles, segmento, t, mouse, pesos_unitarios);
+}
+
+void arrastar_segmento_curva_cubica_ponderado(const CurvaCubicaOps *ops, Pontos *controles,
+                                              int segmento, float t, ponto mouse,
+                                              const float pesos_penalizacao[4]){
+  if(!ops || !ops->avaliar || !ops->pesos_controles || !controles ||
+     !controles->data || controles->quantidade_atual < 4 || segmento < 0 ||
+     !pesos_penalizacao || !isfinite(t) || !isfinite(mouse.point[0]) ||
+     !isfinite(mouse.point[1])){
     return;
   }
+  t = fmaxf(0.0f, fminf(1.0f, t));
   int n = controles->quantidade_atual, indices[4];
   ponto P[4];
   for(int i = 0; i < 4; i++){
@@ -227,13 +242,17 @@ void arrastar_segmento_curva_cubica(const CurvaCubicaOps *ops, Pontos *controles
   ops->pesos_controles(t, w);
   float soma = 0;
   for(int i = 0; i < 4; i++){
-    soma += w[i] * w[i];
+    if(!(pesos_penalizacao[i] > 0.0f) || !isfinite(pesos_penalizacao[i])){
+      return;
+    }
+    soma += w[i] * w[i] / pesos_penalizacao[i];
   }
-  if(soma < 1e-8f){
+  if(!(soma >= 1e-8f) || !isfinite(soma)){
     return;
   }
   for(int i = 0; i < 4; i++){
-    controles->data[indices[i]].point[0] += dx * w[i] / soma;
-    controles->data[indices[i]].point[1] += dy * w[i] / soma;
+    float fator = w[i] / pesos_penalizacao[i] / soma;
+    controles->data[indices[i]].point[0] += dx * fator;
+    controles->data[indices[i]].point[1] += dy * fator;
   }
 }

@@ -30,7 +30,7 @@ void curva_subdivisao_ajustar_orcamento(double milissegundos, size_t quantidade_
 size_t curva_subdivisao_nos_ultima_medicao(void);
 
 void gerar_segmento_curva_cubica(const CurvaCubicaOps *ops, ponto P0, ponto P1, ponto P2, ponto P3,
-                                 Pontos *resultado, AABB *box);
+                                 Pontos *resultado, AABB *box, ponto *ponto_final);
 
 ResultadoPicking picking_curva_cubica(const CurvaCubicaOps *ops, AABBTREE *arvore,
                                       Pontos *controles, ponto mouse, float tolerancia,
@@ -38,5 +38,8 @@ ResultadoPicking picking_curva_cubica(const CurvaCubicaOps *ops, AABBTREE *arvor
 
 void arrastar_segmento_curva_cubica(const CurvaCubicaOps *ops, Pontos *controles, int segmento,
                                     float t, ponto mouse);
+void arrastar_segmento_curva_cubica_ponderado(const CurvaCubicaOps *ops, Pontos *controles,
+                                              int segmento, float t, ponto mouse,
+                                              const float pesos_penalizacao[4]);
 
 #endif

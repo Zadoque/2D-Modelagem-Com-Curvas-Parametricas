@@ -1,5 +1,8 @@
 #include "../../includes/curvas/hermite.h"
 #include "../../includes/curvas/curva_generica.h"
+#include <math.h>
+
+#define FATOR_RIGIDEZ 8.0f
 
 void calcular_tangentes_hermite(ponto p0, ponto p1, ponto p2, ponto p3, ponto *t1, ponto *t2){
   for(int e = 0; e < 2; e++){
@@ -42,12 +45,24 @@ static ponto derivar(ponto p0, ponto p1, ponto p2, ponto p3, float t){
   return r;
 }
 static const CurvaCubicaOps OPS = {avaliar, derivar, pesos};
-void gerar_curva_hermite(ponto p0, ponto p1, ponto p2, ponto p3, Pontos *c, AABB *b){
-  gerar_segmento_curva_cubica(&OPS, p0, p1, p2, p3, c, b);
+void gerar_curva_hermite(ponto p0, ponto p1, ponto p2, ponto p3, Pontos *c, AABB *b, ponto *final){
+  gerar_segmento_curva_cubica(&OPS, p0, p1, p2, p3, c, b, final);
 }
 ResultadoPicking picking_hermite(AABBTREE *a, Pontos *c, ponto m, float t, float d){
   return picking_curva_cubica(&OPS, a, c, m, t, d);
 }
-void arrastar_ponto_hermite(Pontos *c, int s, float t, ponto m){
-  arrastar_segmento_curva_cubica(&OPS, c, s, t, m);
+void arrastar_ponto_hermite(Pontos *c, int s, float t, ponto m, float rigidez){
+  if(!isfinite(rigidez)){
+    return;
+  }
+  rigidez = fmaxf(0.0f, fminf(1.0f, rigidez));
+  float penalizacoes[4];
+  for(int i = 0; i < 4; i++){
+    float distancia = fabsf((float)i - (1.0f + t));
+    if(i == 0 || i == 3){
+      distancia += 1.0f;
+    }
+    penalizacoes[i] = 1.0f + FATOR_RIGIDEZ * rigidez * distancia;
+  }
+  arrastar_segmento_curva_cubica_ponderado(&OPS, c, s, t, m, penalizacoes);
 }

@@ -1,5 +1,8 @@
 #include "../../includes/curvas/catmullrom.h"
 #include "../../includes/curvas/curva_generica.h"
+#include <math.h>
+
+#define FATOR_RIGIDEZ 8.0f
 
 static void pesos(float t, float w[4]){
   float t2 = t * t, t3 = t2 * t;
@@ -31,12 +34,21 @@ static ponto derivar(ponto p0, ponto p1, ponto p2, ponto p3, float t){
   return r;
 }
 static const CurvaCubicaOps OPS = {calcular_ponto_catmullrom, derivar, pesos};
-void gerar_curva_catmullrom(ponto p0, ponto p1, ponto p2, ponto p3, Pontos *c, AABB *b){
-  gerar_segmento_curva_cubica(&OPS, p0, p1, p2, p3, c, b);
+void gerar_curva_catmullrom(ponto p0, ponto p1, ponto p2, ponto p3, Pontos *c, AABB *b,
+                            ponto *final){
+  gerar_segmento_curva_cubica(&OPS, p0, p1, p2, p3, c, b, final);
 }
 ResultadoPicking picking_catmullrom(AABBTREE *a, Pontos *c, ponto m, float t, float d){
   return picking_curva_cubica(&OPS, a, c, m, t, d);
 }
-void arrastar_ponto_catmullrom(Pontos *c, int s, float t, ponto m){
-  arrastar_segmento_curva_cubica(&OPS, c, s, t, m);
+void arrastar_ponto_catmullrom(Pontos *c, int s, float t, ponto m, float rigidez){
+  if(!isfinite(rigidez)){
+    return;
+  }
+  rigidez = fmaxf(0.0f, fminf(1.0f, rigidez));
+  float penalizacoes[4];
+  for(int i = 0; i < 4; i++){
+    penalizacoes[i] = 1.0f + FATOR_RIGIDEZ * rigidez * fabsf((float)i - (1.0f + t));
+  }
+  arrastar_segmento_curva_cubica_ponderado(&OPS, c, s, t, m, penalizacoes);
 }
