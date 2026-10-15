@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 typedef ponto (*Eval)(ponto, ponto, ponto, ponto, float);
-typedef void (*Gerar)(ponto, ponto, ponto, ponto, Pontos *, AABB *);
+typedef void (*Gerar)(ponto, ponto, ponto, ponto, Pontos *, AABB *, ponto *);
 typedef ResultadoPicking (*Picking)(AABBTREE *, Pontos *, ponto, float, float);
 
 static ponto hermite_local(ponto a, ponto b, ponto c, ponto d, float t){
@@ -29,8 +29,9 @@ static void verificar(const char *nome, Eval eval, Gerar gerar, Picking picking)
   AABB_vec boxes;
   aabb_vec_init(&boxes, 1);
   AABB b = {0};
+  ponto ponto_final;
   b.segmento_indice = 0;
-  gerar(ps[0], ps[1], ps[2], ps[3], &curva, &b);
+  gerar(ps[0], ps[1], ps[2], ps[3], &curva, &b, &ponto_final);
   assert(aabb_vec_push(&boxes, b) == 0);
   AABBTREE *arvore = aabb_vec_para_arvore(&boxes);
   float alvo_t = 0.371f;
