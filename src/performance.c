@@ -6,6 +6,8 @@
 #define _POSIX_C_SOURCE 199309L
 
 #include "./../includes/performance.h"
+#include "./../includes/bspline_topologia.h"
+#include "./../includes/geometria_curvas.h"
 #include <stdio.h>
 #include <time.h>
 
@@ -37,6 +39,7 @@ static __thread double inicio_geracao_bezier;
 static __thread double inicio_geracao_bspline;
 static __thread double inicio_geracao_catmullrom;
 static __thread double inicio_desenho;
+static __thread double inicio_geracao_topologica;
 
 void __attribute__((no_instrument_function)) performance_iniciar_medicao(void){
   metricas_performance.tempo_geracao_ms = 0.0;
@@ -51,6 +54,16 @@ void __attribute__((no_instrument_function)) performance_iniciar_medicao(void){
       buffer_controles ? buffer_controles->quantidade_atual : 0;
   metricas_performance.buffer_controle_capacidade =
       buffer_controles ? buffer_controles->quantidade_max : 0;
+}
+
+void __attribute__((no_instrument_function)) performance_iniciar_geracao_topologica(void){
+  inicio_geracao_topologica = agora_ms_precisa();
+}
+
+void __attribute__((no_instrument_function)) performance_finalizar_geracao_topologica(
+    size_t pontos_gerados){
+  metricas_performance.tempo_geracao_ms += agora_ms_precisa() - inicio_geracao_topologica;
+  metricas_performance.pontos_gerados += pontos_gerados;
 }
 
 void __attribute__((no_instrument_function)) __cyg_profile_func_enter(void *func, void *caller){
@@ -126,7 +139,7 @@ void __attribute__((no_instrument_function)) __cyg_profile_func_exit(void *func,
  *     entre chamadas.
  * ========================================================================= */
 
-typedef void (*FuncGeradoraCurva)(ponto, ponto, ponto, ponto, Pontos *, AABB *);
+typedef void (*FuncGeradoraCurva)(ponto, ponto, ponto, ponto, Pontos *, AABB *, ponto *);
 
 typedef struct {
   const char *nome;
@@ -142,18 +155,21 @@ static ResultadoBenchmark benchmark_executar_curva(const char *nome, FuncGerador
                                                    int n_warmup, int n_execucoes){
   Pontos curva;
   AABB box;
+  ponto ponto_final;
   ResultadoBenchmark resultado = {0};
 
   pontos_init(&curva, 256);
 
   for(int i = 0; i < n_warmup; i++){
-    gerar(P0, P1, P2, P3, &curva, &box);
+    curva.quantidade_atual = 0;
+    gerar(P0, P1, P2, P3, &curva, &box, &ponto_final);
   }
 
   long total_pontos = 0;
   double inicio = agora_ms_precisa();
   for(int i = 0; i < n_execucoes; i++){
-    gerar(P0, P1, P2, P3, &curva, &box);
+    curva.quantidade_atual = 0;
+    gerar(P0, P1, P2, P3, &curva, &box, &ponto_final);
     total_pontos += curva.quantidade_atual;
   }
   double fim = agora_ms_precisa();
@@ -169,6 +185,43 @@ static ResultadoBenchmark benchmark_executar_curva(const char *nome, FuncGerador
 
   pontos_free(&curva);
   return resultado;
+}
+
+static void benchmark_executar_fluxo_topologico(int n_warmup, int n_execucoes){
+  Pontos controles;
+  BSplineTopologia spline;
+  GeometriaCurvas geometria;
+  AABB_vec boxes;
+  pontos_init(&controles, 64);
+  for(int i = 0; i < 64; i++){
+    ponto controle = {{(float)i * 8.0f, sinf((float)i * 0.37f) * 120.0f, 1.0f}};
+    pontos_push(&controles, controle);
+  }
+  if(bspline_topologia_inicializar_uniforme_aberta(&spline, &controles, 3) != 0){
+    pontos_free(&controles);
+    return;
+  }
+  geometria_curvas_init(&geometria);
+  aabb_vec_init(&boxes, 64);
+  for(int i = 0; i < n_warmup; i++){
+    geometria_curvas_atualizar_bspline_topologica(&geometria, &boxes, &spline);
+  }
+  double inicio = agora_ms_precisa();
+  for(int i = 0; i < n_execucoes; i++){
+    geometria_curvas_atualizar_bspline_topologica(&geometria, &boxes, &spline);
+    AABBTREE *arvore = aabb_vec_para_arvore(&boxes);
+    ponto alvo = bspline_topologia_avaliar(&spline, 30.5f);
+    (void)bspline_topologia_picking_arvore(&spline, arvore, alvo, 1.0f);
+    aabb_tree_free(arvore);
+  }
+  double tempo = agora_ms_precisa() - inicio;
+  printf("[BENCH] B-spline topologica | execucoes=%-6d | geracao+AABB+arvore+picking=%8.5f ms | "
+         "vertices=%d\n", n_execucoes, tempo / (double)n_execucoes,
+         geometria.vertices.quantidade_atual);
+  free(boxes.dados);
+  geometria_curvas_free(&geometria);
+  bspline_topologia_liberar(&spline);
+  pontos_free(&controles);
 }
 
 static void imprimir_resultado_benchmark(const ResultadoBenchmark *r){
@@ -212,5 +265,6 @@ void performance_benchmark_executar(int n_execucoes){
   imprimir_resultado_benchmark(&r_bezier);
   imprimir_resultado_benchmark(&r_bspline);
   imprimir_resultado_benchmark(&r_catmullrom);
+  benchmark_executar_fluxo_topologico(n_warmup, n_execucoes);
   printf("=== FIM DO BENCHMARK ===\n\n");
 }

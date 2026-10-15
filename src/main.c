@@ -18,6 +18,7 @@ int main(int argc, char **argv){
     performance_benchmark_executar(execucoes);
     return 0;
   }
+  int benchmark_vbo = argc > 1 && strcmp(argv[1], "--benchmark-vbo") == 0;
   printf("=== Trabalho de Computação Gráfica ===\n");
 
   // Inicializar GLUT
@@ -37,6 +38,14 @@ int main(int argc, char **argv){
   inicializar_menu();
   // Inicializar OpenGL
   initGL();
+
+  if(benchmark_vbo){
+    int controles = argc > 2 ? atoi(argv[2]) : 1000;
+    int quadros = argc > 3 ? atoi(argv[3]) : 120;
+    opengl_benchmark_vbo_executar(controles, quadros);
+    finalizar_aplicacao();
+    return 0;
+  }
 
   printf("Clique na janela para adicionar pontos!\n");
 

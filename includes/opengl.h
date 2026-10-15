@@ -13,6 +13,7 @@
 #include "curvas/bspline.h"
 #include "curvas/catmullrom.h"
 #include "transformacoes.h"
+#include "contadores_interface.h"
 
 typedef struct {
   int indice;
@@ -22,6 +23,8 @@ typedef struct {
 typedef struct {
   int seg_curva;
   float t;
+  float u_global;
+  float t_local;
   Curva curva_selecionada;
 } Selecao_curva;
 
@@ -35,6 +38,9 @@ void desenhar_curva_atual();
 void onMouse(int button, int state, int x, int y);
 void onMouseMove(int x, int y);
 void onMotion(int x, int y);
+/* Núcleo da issue #19; a interface da issue #18 chama esta função. */
+int definir_modo_anti_autointerferencia(int ativo);
+void opengl_benchmark_vbo_executar(int quantidade_controles, int quadros);
 int traduzCoordenadaX(int x);
 int traduzCoordenadaY(int y);
 

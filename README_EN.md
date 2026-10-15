@@ -33,6 +33,13 @@ tasks. A non-pinned `shell.nix` is also available.
 See the [Portuguese README](README.md) for all installation commands,
 architecture, test coverage, benchmark usage, and installation targets.
 
+## Pending improvement: OpenGL buffers
+
+The interface still uses immediate-mode OpenGL. A future VBO migration should
+upload curve vertices and control points only when they change, then render
+each with `glDrawArrays`. This removes per-vertex CPU calls from static frames,
+but does not reduce geometry generation, AABB updates, or picking costs.
+
 ## License
 
 Released under the [MIT License](LICENSE). Copyright © 2026 Zadoque Carneiro.

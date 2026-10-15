@@ -37,6 +37,27 @@ Versão atual: **0.1.0**. [English documentation](README_EN.md).
 - São necessários ao menos quatro controles para um segmento cúbico.
 - O benchmark mede geração isolada, não FPS da aplicação.
 
+## Melhorias pendentes
+
+### Renderização por buffers OpenGL
+
+A interface ainda usa OpenGL em modo imediato: envia cada vértice da curva e
+cada controle com `glBegin`/`glVertex` em todos os frames. A migração para VBOs
+é a próxima melhoria recomendada de renderização:
+
+- ao reconstruir a geometria, enviar `geometria_curva.vertices` uma vez com
+  `glBufferData` ou `glBufferSubData`;
+- desenhar a curva a cada frame com uma única chamada a `glDrawArrays`;
+- manter um segundo VBO para os controles;
+- reenviar os buffers somente quando a geometria ou os controles mudarem.
+
+Isso remove milhares de chamadas de CPU por frame para uma nuvem grande e
+melhora substancialmente o limite prático da B-spline aberta. VBO não reduz o
+custo de gerar a geometria, atualizar AABBs ou executar picking. A avaliação
+periódica da B-spline fechada já usa busca binária de span nesta versão; o
+gargalo remanescente em curvas fechadas grandes é a reconstrução geométrica e
+o número de amostras, não a transferência dos vértices para a GPU.
+
 ## Dependências
 
 - Compilador C99, GNU Make, OpenGL, GLU e FreeGLUT;

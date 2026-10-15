@@ -42,6 +42,8 @@ typedef struct {
 /* Inicia uma nova medição da curva exibida, sem carregar o frame anterior. */
 void performance_definir_buffers(const Pontos *controles, const Pontos *segmento_temporario);
 void performance_iniciar_medicao(void);
+void performance_iniciar_geracao_topologica(void);
+void performance_finalizar_geracao_topologica(size_t pontos_gerados);
 void performance_benchmark_executar(int n_execucoes);
 
 #endif /* PERFORMANCE_H */
