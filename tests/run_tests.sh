@@ -23,5 +23,5 @@ build_run test_transformacoes src/pontos.c src/matriz.c src/transformacoes.c
 build_run test_slider src/slider.c
 build_run test_densidade src/densidade.c
 build_run test_contadores_interface src/pontos.c src/contadores_interface.c
-build_run test_benchmark_painel src/benchmark_painel.c
+build_run test_benchmark_painel src/pontos.c src/aabb.c src/curvas/ultis/ultis.c src/curvas/curva_generica.c src/curvas/bezier.c src/curvas/bspline.c src/curvas/hermite.c src/curvas/catmullrom.c src/bspline_topologia.c src/obb.c src/geometria_curvas.c src/benchmark_painel.c
 build_run test_alocacao src/pontos.c src/aabb.c src/vetor.c -Wl,--wrap=realloc

@@ -76,6 +76,7 @@ typedef struct {
   char texto[32];
   int destacado;
 } BotaoAntiAutointerferencia;
+typedef struct { int x, y, largura, altura, destacado; } BotaoBenchmark;
 
 typedef struct {
   Botoes1 botoes1[5];
@@ -102,6 +103,7 @@ extern int info_hover;
 extern SliderRigidez slider_rigidez;
 extern SeletorDensidade seletor_densidade;
 extern BotaoAntiAutointerferencia botao_anti_autointerferencia;
+extern BotaoBenchmark botao_benchmark;
 
 // Funções do menu
 void atualizar_dimensoes_menu();
@@ -116,6 +118,7 @@ float obter_rigidez_movimento(void);
 float obter_limiar_densidade(void);
 unsigned obter_revisao_densidade(void);
 int botao_anti_autointerferencia_contem(int x, int y);
+int botao_benchmark_contem(int x, int y);
 float calcular_largura_texto_stroke(void *font, const char *texto, float escala);
 float calcular_altura_fonte_stroke(float escala);
 void desenhar_texto(float x, float y, void *font, const char *texto, float escala);

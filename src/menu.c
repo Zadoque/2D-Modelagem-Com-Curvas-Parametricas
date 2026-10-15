@@ -20,6 +20,7 @@ int info_hover = -1;
 SliderRigidez slider_rigidez;
 SeletorDensidade seletor_densidade;
 BotaoAntiAutointerferencia botao_anti_autointerferencia;
+BotaoBenchmark botao_benchmark;
 
 static int slider_visivel(void){
   return estado_atual.criacao_ou_selecao == MODO_SELECIONAR_CURVA;
@@ -47,6 +48,9 @@ void atualizar_dimensoes_menu(){
   int largura_botao = menu_largura - (2 * margem);
   int altura_botao = altura_janela * 0.03; // 3% da altura da janela
   int espacamento = altura_janela * 0.01;  // 1% da altura da janela
+
+  botao_benchmark = (BotaoBenchmark){margem, altura_janela - altura_botao - margem,
+                                     largura_botao, altura_botao, 0};
 
   menu_altura_fonte = altura_botao * 0.45f;
   menu_escala_fonte = (largura_botao * 0.09f) / 121.05f;
@@ -319,6 +323,22 @@ void desenhar_botao_generico(void *botao, TipoBotao tipo, int indice){
 }
 
 void desenhar_botoes_menu(){
+  glColor3f(botao_benchmark.destacado ? 0.9f : 0.95f, botao_benchmark.destacado ? 0.9f : 0.95f,
+            botao_benchmark.destacado ? 0.7f : 0.95f);
+  glBegin(GL_QUADS);
+  glVertex2f(botao_benchmark.x, botao_benchmark.y);
+  glVertex2f(botao_benchmark.x + botao_benchmark.largura, botao_benchmark.y);
+  glVertex2f(botao_benchmark.x + botao_benchmark.largura, botao_benchmark.y + botao_benchmark.altura);
+  glVertex2f(botao_benchmark.x, botao_benchmark.y + botao_benchmark.altura);
+  glEnd();
+  glColor3f(0, 0, 0);
+  glBegin(GL_LINE_LOOP);
+  glVertex2f(botao_benchmark.x, botao_benchmark.y);
+  glVertex2f(botao_benchmark.x + botao_benchmark.largura, botao_benchmark.y);
+  glVertex2f(botao_benchmark.x + botao_benchmark.largura, botao_benchmark.y + botao_benchmark.altura);
+  glVertex2f(botao_benchmark.x, botao_benchmark.y + botao_benchmark.altura);
+  glEnd();
+  desenhar_texto(botao_benchmark.x + 8, botao_benchmark.y + 7, menu_fonte_stroke, "Benchmark", menu_escala_fonte);
   for(int i = 0; i < 5; i++){
     desenhar_botao_generico(&botoes.botoes1[i], TIPO_BOTAO1, i);
   }
@@ -451,6 +471,11 @@ int botao_anti_autointerferencia_contem(int x, int y){
          x <= botao_anti_autointerferencia.x + botao_anti_autointerferencia.largura &&
          y >= botao_anti_autointerferencia.y &&
          y <= botao_anti_autointerferencia.y + botao_anti_autointerferencia.altura;
+}
+
+int botao_benchmark_contem(int x, int y){
+  return x >= botao_benchmark.x && x <= botao_benchmark.x + botao_benchmark.largura &&
+         y >= botao_benchmark.y && y <= botao_benchmark.y + botao_benchmark.altura;
 }
 
 float calcular_largura_texto_stroke(void *font, const char *texto, float escala){

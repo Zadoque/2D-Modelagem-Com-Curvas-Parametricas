@@ -23,6 +23,12 @@ int main(void){
   assert(resultado.amostras == 2);
   assert(benchmark_resultado_media(&resultado) == 2.0);
   assert(resultado.minimo_ms == 1.0 && resultado.maximo_ms == 3.0);
+  benchmark_resultado_limpar(&resultado);
+  uint32_t amostra = configuracao.semente;
+  assert(benchmark_painel_amostra_cpu(&configuracao, 0, BENCH_GERACAO, &amostra, &resultado) == 0);
+  assert(resultado.amostras == 1);
+  assert(benchmark_painel_amostra_cpu(&configuracao, 2, BENCH_PICKING, &amostra, &resultado) == 0);
+  assert(resultado.amostras == 2);
   puts("test_benchmark_painel: OK");
   return 0;
 }

@@ -2,6 +2,7 @@
 #define GL_GLEXT_PROTOTYPES
 #include "./../includes/opengl.h"
 #include "./../includes/obb.h"
+#include "./../includes/benchmark_painel.h"
 #include <GL/freeglut_std.h>
 #include <GL/gl.h>
 #include <GL/glext.h>
@@ -38,6 +39,12 @@ static ponto centro_shear_inicial;
 static int shear_arrastando;
 static int eixo_shear;
 static int modo_anti_autointerferencia;
+static int painel_benchmark_aberto;
+static int benchmark_em_execucao;
+static ConfiguracaoBenchmark configuracao_benchmark;
+static ResultadoBenchmarkPainel resultados_benchmark[BENCH_CURVAS][BENCH_TESTES];
+static uint32_t aleatorio_benchmark;
+static int benchmark_curva_atual, benchmark_teste_atual, benchmark_amostra_atual;
 typedef struct {
   GLuint curva;
   GLuint controles;
@@ -51,6 +58,89 @@ static BuffersRenderizacao buffers_renderizacao;
 #define TOLERANCIA_AUTOINTERFERENCIA 0.05f
 /* Configurações visuais. */
 static float cor_fundo[3] = {0.2f, 0.3f, 0.4f};
+
+static double agora_benchmark_ms(void);
+static void desenhar_quadro_benchmark_vbo(void);
+
+static void texto_bitmap(int x, int y, const char *texto){
+  glRasterPos2i(x, y);
+  for(const char *c = texto; *c; c++){ glutBitmapCharacter(GLUT_BITMAP_8_BY_13, *c); }
+}
+
+static void retangulo_benchmark(int x, int y, int largura, int altura, float r, float g, float b){
+  glColor3f(r, g, b);
+  glBegin(GL_QUADS);
+  glVertex2i(x, y); glVertex2i(x + largura, y); glVertex2i(x + largura, y + altura); glVertex2i(x, y + altura);
+  glEnd();
+}
+
+static void iniciar_benchmark_painel(void){
+  for(int curva = 0; curva < BENCH_CURVAS; curva++){
+    for(int teste = 0; teste < BENCH_TESTES; teste++){ benchmark_resultado_limpar(&resultados_benchmark[curva][teste]); }
+  }
+  aleatorio_benchmark = configuracao_benchmark.semente;
+  benchmark_curva_atual = benchmark_teste_atual = benchmark_amostra_atual = 0;
+  benchmark_em_execucao = 1;
+}
+
+static void passo_benchmark_painel(void){
+  if(!benchmark_em_execucao){ return; }
+  for(int passo = 0; passo < 8 && benchmark_em_execucao; passo++){
+    while(benchmark_curva_atual < BENCH_CURVAS && !(configuracao_benchmark.mascara_curvas & (1u << benchmark_curva_atual))){ benchmark_curva_atual++; benchmark_teste_atual = 0; }
+    if(benchmark_curva_atual == BENCH_CURVAS){ benchmark_em_execucao = 0; break; }
+    while(benchmark_teste_atual < BENCH_TESTES && !(configuracao_benchmark.mascara_testes & (1u << benchmark_teste_atual))){ benchmark_teste_atual++; benchmark_amostra_atual = 0; }
+    if(benchmark_teste_atual == BENCH_TESTES){ benchmark_curva_atual++; benchmark_teste_atual = 0; continue; }
+    TipoBenchmark tipo = (TipoBenchmark)(1u << benchmark_teste_atual);
+    ResultadoBenchmarkPainel *resultado = &resultados_benchmark[benchmark_curva_atual][benchmark_teste_atual];
+    if(tipo == BENCH_DESENHO){
+      double inicio = agora_benchmark_ms();
+      desenhar_quadro_benchmark_vbo();
+      if(benchmark_amostra_atual >= configuracao_benchmark.warmup){
+        benchmark_resultado_adicionar(resultado, agora_benchmark_ms() - inicio);
+      }
+      benchmark_amostra_atual++;
+      if(benchmark_amostra_atual >= configuracao_benchmark.warmup + configuracao_benchmark.repeticoes){ benchmark_teste_atual++; benchmark_amostra_atual = 0; }
+      continue;
+    }
+    if(benchmark_amostra_atual >= configuracao_benchmark.warmup){
+      (void)benchmark_painel_amostra_cpu(&configuracao_benchmark, benchmark_curva_atual, tipo,
+                                         &aleatorio_benchmark, resultado);
+    } else {
+      ResultadoBenchmarkPainel descarte;
+      benchmark_resultado_limpar(&descarte);
+      (void)benchmark_painel_amostra_cpu(&configuracao_benchmark, benchmark_curva_atual, tipo,
+                                         &aleatorio_benchmark, &descarte);
+    }
+    benchmark_amostra_atual++;
+    if(benchmark_amostra_atual >= configuracao_benchmark.warmup + configuracao_benchmark.repeticoes){ benchmark_teste_atual++; benchmark_amostra_atual = 0; }
+  }
+  glutPostRedisplay();
+}
+
+static void desenhar_painel_benchmark(int largura, int altura){
+  if(!painel_benchmark_aberto){ return; }
+  glViewport(0, 0, largura, altura); glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, largura, 0, altura); glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+  int x = largura / 2 - 300, y = altura / 2 - 250;
+  retangulo_benchmark(x, y, 600, 500, 0.08f, 0.09f, 0.12f);
+  glColor3f(1, 1, 1); texto_bitmap(x + 15, y + 475, "Benchmark — configuracao e resultados (ms por operacao)");
+  char linha[128];
+  snprintf(linha, sizeof(linha), "Repeticoes: %d  Warm-up: %d  Rigidez: %.2f  Densidade: %d  Raio: %.1f", configuracao_benchmark.repeticoes, configuracao_benchmark.warmup, configuracao_benchmark.rigidez, configuracao_benchmark.posicao_densidade + 1, configuracao_benchmark.raio_arrasto);
+  texto_bitmap(x + 15, y + 448, linha);
+  texto_bitmap(x + 15, y + 428, "Curvas: H  C  B  Z     Testes: G geracao, D desenho, P picking, A arrasto, I anti");
+  static const char *nomes[] = {"Hermite", "Catmull", "B-spline", "Bezier"};
+  for(int curva = 0; curva < BENCH_CURVAS; curva++){
+    snprintf(linha, sizeof(linha), "%s", nomes[curva]); texto_bitmap(x + 15, y + 390 - curva * 55, linha);
+    for(int teste = 0; teste < BENCH_TESTES; teste++){
+      double media = benchmark_resultado_media(&resultados_benchmark[curva][teste]);
+      int barra = (int)(media * 40.0); if(barra > 360){ barra = 360; }
+      retangulo_benchmark(x + 100 + teste * 75, y + 380 - curva * 55, barra / 5 + 1, 14, 0.2f, 0.7f, 0.35f);
+      snprintf(linha, sizeof(linha), "%.3f", media); glColor3f(1,1,1); texto_bitmap(x + 100 + teste * 75, y + 360 - curva * 55, linha);
+    }
+  }
+  texto_bitmap(x + 15, y + 105, "Clique: curvas [linha 1], testes [linha 2]; -/+ repeticoes; iniciar; fechar.");
+  retangulo_benchmark(x + 15, y + 25, 120, 35, 0.2f, 0.65f, 0.25f); retangulo_benchmark(x + 155, y + 25, 120, 35, 0.65f, 0.25f, 0.25f);
+  glColor3f(1,1,1); texto_bitmap(x + 43, y + 38, benchmark_em_execucao ? "Executando" : "Iniciar"); texto_bitmap(x + 195, y + 38, "Fechar");
+}
 
 static uint64_t assinatura_pontos(const Pontos *pontos){
   uint64_t assinatura = UINT64_C(1469598103934665603);
@@ -140,6 +230,7 @@ void initGL(){
   selecao_poligono = 0;
   shear_arrastando = 0;
   eixo_shear = 0;
+  benchmark_configuracao_padrao(&configuracao_benchmark);
   glGenBuffers(1, &buffers_renderizacao.curva);
   glGenBuffers(1, &buffers_renderizacao.controles);
   buffers_renderizacao.disponivel =
@@ -707,7 +798,33 @@ void display(){
 
   desenhar_botoes_menu();
   desenhar_info();
+  desenhar_painel_benchmark(largura_janela, altura_janela);
   glFlush();
+  passo_benchmark_painel();
+}
+
+static int processar_clique_painel_benchmark(int x, int y){
+  int largura = glutGet(GLUT_WINDOW_WIDTH), altura = glutGet(GLUT_WINDOW_HEIGHT);
+  int esquerda = largura / 2 - 300, baixo = altura / 2 - 250;
+  int local_x = x - esquerda, local_y = (altura - y) - baixo;
+  if(local_y >= 25 && local_y <= 60){
+    if(local_x >= 15 && local_x <= 135){ if(!benchmark_em_execucao){ iniciar_benchmark_painel(); } return 1; }
+    if(local_x >= 155 && local_x <= 275){ painel_benchmark_aberto = 0; benchmark_em_execucao = 0; return 1; }
+  }
+  if(local_y >= 405 && local_y <= 435){
+    int indice = (local_x - 85) / 40;
+    if(indice >= 0 && indice < BENCH_CURVAS){ configuracao_benchmark.mascara_curvas ^= 1u << indice; return 1; }
+  }
+  if(local_y >= 380 && local_y <= 405){
+    int indice = (local_x - 235) / 38;
+    if(indice >= 0 && indice < BENCH_TESTES){ configuracao_benchmark.mascara_testes ^= 1u << indice; return 1; }
+  }
+  if(local_y >= 440 && local_y <= 470){
+    if(local_x < 300){ configuracao_benchmark.repeticoes = configuracao_benchmark.repeticoes > 10 ? configuracao_benchmark.repeticoes - 10 : 1; }
+    else { configuracao_benchmark.repeticoes += 10; }
+    return 1;
+  }
+  return 1;
 }
 
 void processar_clique_desenho(int x, int y){
@@ -1023,6 +1140,11 @@ int processar_clique_menu(int x, int y){
 void onMouse(int button, int state, int x, int y){
   if(button == GLUT_LEFT_BUTTON){
     if(state == GLUT_DOWN){
+      if(painel_benchmark_aberto){
+        (void)processar_clique_painel_benchmark(x, y);
+        glutPostRedisplay();
+        return;
+      }
       int largura_janela = glutGet(GLUT_WINDOW_WIDTH);
       int largura_desenho = largura_janela - menu_largura;
       if(x < largura_desenho){
@@ -1031,6 +1153,11 @@ void onMouse(int button, int state, int x, int y){
       } else {
         // Clique no menu
         interacao_menu = processar_clique_menu(x - largura_desenho, y);
+        if(botao_benchmark_contem(x - largura_desenho, glutGet(GLUT_WINDOW_HEIGHT) - y)){
+          painel_benchmark_aberto = 1;
+          interacao_menu = 0;
+          glutPostRedisplay();
+        }
       }
     } else {
       if(interacao_menu){

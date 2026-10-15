@@ -32,6 +32,15 @@ typedef struct {
   int remocoes;
 } ResultadoBenchmarkPainel;
 
+enum { BENCH_CURVAS = 4, BENCH_TESTES = 5 };
+
+/* Executa uma única amostra CPU isolada da cena interativa. O tipo de curva
+ * segue o enum Curva (Hermite, Catmull-Rom, B-spline e Bezier). Desenho é
+ * medido pelo adaptador OpenGL, pois exige contexto gráfico. */
+int benchmark_painel_amostra_cpu(const ConfiguracaoBenchmark *configuracao, int curva,
+                                 TipoBenchmark tipo, uint32_t *aleatorio,
+                                 ResultadoBenchmarkPainel *resultado);
+
 void benchmark_configuracao_padrao(ConfiguracaoBenchmark *configuracao);
 uint32_t benchmark_proximo_aleatorio(uint32_t *estado);
 float benchmark_aleatorio_intervalo(uint32_t *estado, float minimo, float maximo);
