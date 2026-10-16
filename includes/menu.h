@@ -2,6 +2,8 @@
 #define MENU_H
 
 #include "pontos.h"
+#include "densidade.h"
+#include "slider.h"
 
 // Estados da aplicação
 typedef enum {
@@ -9,7 +11,7 @@ typedef enum {
   MODO_APAGAR_PONTO,
   MODO_SELECIONAR_PONTO,
   MODO_SELECIONAR_POLIGONO,
-  MODO_SELEICIONAR_CURVA
+  MODO_SELECIONAR_CURVA
 } Criacao_ou_selecao;
 
 typedef enum { TRANSLACAO, ROTACAO, ESCALA, SHEAR, NENHUMA } Operacoes;
@@ -32,7 +34,13 @@ typedef struct {
   Operacoes operacao;
   char qtd_pontos_controle[50];
   char qtd_nuvem_pontos[50];
+  int qtd_pontos_controle_number;
   int qtd_nuvem_pontos_number;
+  float rigidez_movimento;
+  int posicao_densidade;
+  float limiar_distancia_controles;
+  unsigned revisao_densidade;
+  int anti_autointerferencia;
 } EstadoAplicacao;
 
 typedef struct {
@@ -64,6 +72,13 @@ typedef struct {
 } BotoesOperacoes;
 
 typedef struct {
+  int x, y, largura, altura;
+  char texto[32];
+  int destacado;
+} BotaoAntiAutointerferencia;
+typedef struct { int x, y, largura, altura, destacado; } BotaoBenchmark;
+
+typedef struct {
   Botoes1 botoes1[5];
   Botoes2 botoes2[2];
   Botoes3 botoes3[4];
@@ -85,14 +100,25 @@ extern BotoesOperacoes botoes_operacoes[4];
 extern int menu_largura;
 extern InfoItem info[2];
 extern int info_hover;
+extern SliderRigidez slider_rigidez;
+extern SeletorDensidade seletor_densidade;
+extern BotaoAntiAutointerferencia botao_anti_autointerferencia;
+extern BotaoBenchmark botao_benchmark;
 
 // Funções do menu
 void atualizar_dimensoes_menu();
 void inicializar_menu();
-void desenhar_botao_generico(void* botao, TipoBotao tipo, int indice);
+void desenhar_botao_generico(void *botao, TipoBotao tipo, int indice);
 void desenhar_botoes_menu();
-void processar_clique_menu(int x, int y);
+int processar_clique_menu(int x, int y);
+int processar_arrasto_menu(int x, int y);
+int finalizar_arrasto_menu(void);
 void processar_mouse_move_menu(int x, int y);
+float obter_rigidez_movimento(void);
+float obter_limiar_densidade(void);
+unsigned obter_revisao_densidade(void);
+int botao_anti_autointerferencia_contem(int x, int y);
+int botao_benchmark_contem(int x, int y);
 float calcular_largura_texto_stroke(void *font, const char *texto, float escala);
 float calcular_altura_fonte_stroke(float escala);
 void desenhar_texto(float x, float y, void *font, const char *texto, float escala);

@@ -2,289 +2,510 @@
 #include <GL/glut.h>
 #include <string.h>
 #include <stdio.h>
-EstadoAplicacao estado_atual = {MODO_CRIAR_PONTO, MODO_POLIGONO_ABERTO,
-                                MODO_CURVA_HERMITE, NENHUMA, "0", "0", 0};
+EstadoAplicacao estado_atual = {
+    MODO_CRIAR_PONTO, MODO_POLIGONO_ABERTO, MODO_CURVA_HERMITE, NENHUMA, "0", "0", 0, 0,
+    0.0f, 0, 230.0f, 0, 0};
 
 int menu_largura = 200;
-float menu_escala_fonte = 0.1f;
-float menu_altura_fonte = 12.0f;
-float info_escala_fonte = 5.0f;
-void *menu_fonte_stroke = GLUT_STROKE_ROMAN;
+static float menu_escala_fonte = 0.1f;
+static float menu_altura_fonte = 12.0f;
+static float info_escala_fonte = 5.0f;
+static void *menu_fonte_stroke = GLUT_STROKE_ROMAN;
+static void desenhar_tooltip_rigidez(void);
 
 Botoes botoes;
 BotoesOperacoes botoes_operacoes[4];
 InfoItem info[2];
 int info_hover = -1;
+SliderRigidez slider_rigidez;
+SeletorDensidade seletor_densidade;
+BotaoAntiAutointerferencia botao_anti_autointerferencia;
+BotaoBenchmark botao_benchmark;
 
-void atualizar_dimensoes_menu() {
-    int altura_janela = glutGet(GLUT_WINDOW_HEIGHT);
-    int largura_janela = glutGet(GLUT_WINDOW_WIDTH);
-    printf("\n\tA largura da janela é %d e a altura %d", altura_janela, largura_janela);
-
-    // Menu ocupa 15% da largura ou mínimo 150px.
-    menu_largura = (largura_janela * 0.15 < 150) ? 150 : largura_janela * 0.15;
-
-    int margem = menu_largura * 0.05;
-    int largura_botao = menu_largura - (2 * margem);
-    int altura_botao = altura_janela * 0.03; // 3% da atura da janela
-    int espacamento = altura_janela * 0.01; // 1% da altura da janela
-
-    menu_altura_fonte = altura_botao * 0.45f;
-    menu_escala_fonte = (largura_botao * 0.09f) / 121.05f;
-    info_escala_fonte = (largura_botao * 0.05f) / 121.0f;
-
-    // Painel de status: canto inferior direito do menu.
-    const int painel_margem = margem / 2;
-    const int painel_espacamento = espacamento / 2;
-    const int painel_largura = menu_largura - 2 * painel_margem;
-    const int item_altura = altura_botao * 0.9;
-    const int y_base = painel_margem;
-
-    strcpy(info[0].texto, "Pontos de controle: 0");
-    strcpy(info[0].tooltip, "Qtd de pontos de controle.");
-    info[0].x = painel_margem;
-    info[0].y = y_base + item_altura + painel_espacamento;
-    info[0].largura = calcular_largura_texto_stroke(menu_fonte_stroke, info[0].texto, info_escala_fonte);
-    info[0].larguratooltip = calcular_largura_texto_stroke(menu_fonte_stroke, info[0].tooltip, info_escala_fonte);
-    info[0].altura =  calcular_altura_fonte_stroke(menu_escala_fonte);
-  
-
-    strcpy(info[1].texto, "Nuvem de pontos: 0");
-    strcpy(info[1].tooltip, "Qtd de pontos da curva atual.");
-    info[1].x = painel_margem;
-    info[1].y = y_base;
-    info[1].largura = calcular_largura_texto_stroke(menu_fonte_stroke, info[0].texto, info_escala_fonte);
-    info[1].larguratooltip = calcular_largura_texto_stroke(menu_fonte_stroke, info[0].tooltip, info_escala_fonte);
-    info[1].altura =  calcular_altura_fonte_stroke(menu_escala_fonte);
-    // === BOTÕES DE CRIAÇÃO/SELEÇÃO (Grupo 1) ===
-    int y_inicio_grupo1 = altura_janela * 0.05;
-    strcpy(botoes.botoes1[0].texto, "Criar Ponto");
-    botoes.botoes1[0].x = margem;
-    botoes.botoes1[0].y = y_inicio_grupo1;
-    botoes.botoes1[0].largura = largura_botao;
-    botoes.botoes1[0].altura = altura_botao;
-    botoes.botoes1[0].acao = MODO_CRIAR_PONTO;
-
-    strcpy(botoes.botoes1[1].texto, "Apagar Ponto");
-    botoes.botoes1[1].x = margem;
-    botoes.botoes1[1].y = y_inicio_grupo1 + (altura_botao + espacamento);
-    botoes.botoes1[1].largura = largura_botao;
-    botoes.botoes1[1].altura = altura_botao;
-    botoes.botoes1[1].acao = MODO_APAGAR_PONTO;
-
-    strcpy(botoes.botoes1[2].texto, "Selecionar vertice");
-    botoes.botoes1[2].x = margem;
-    botoes.botoes1[2].y = y_inicio_grupo1 + 2 * (altura_botao + espacamento);
-    botoes.botoes1[2].largura = largura_botao;
-    botoes.botoes1[2].altura = altura_botao;
-    botoes.botoes1[2].acao = MODO_SELECIONAR_PONTO;
-
-    strcpy(botoes.botoes1[3].texto, "Operar Poligono");
-    botoes.botoes1[3].x = margem;
-    botoes.botoes1[3].y = y_inicio_grupo1 + 3 * (altura_botao + espacamento);
-    botoes.botoes1[3].largura = largura_botao;
-    botoes.botoes1[3].altura = altura_botao;
-    botoes.botoes1[3].acao = MODO_SELECIONAR_POLIGONO;
-
-    strcpy(botoes.botoes1[4].texto, "Selecionar Curva");
-    botoes.botoes1[4].x = margem;
-    botoes.botoes1[4].y = y_inicio_grupo1 + 4 * (altura_botao + espacamento);
-    botoes.botoes1[4].largura = largura_botao;
-    botoes.botoes1[4].altura = altura_botao;
-    botoes.botoes1[4].acao = MODO_SELEICIONAR_CURVA;
-
-    // === BOTÕES DE POLÍGONO (Grupo 2) ===
-    int y_inicio_grupo2 = y_inicio_grupo1 + 5 * (altura_botao + espacamento) + altura_janela * 0.03;
-
-    strcpy(botoes.botoes2[0].texto, "Poligono Aberto");
-    botoes.botoes2[0].x = margem;
-    botoes.botoes2[0].y = y_inicio_grupo2;
-    botoes.botoes2[0].largura = largura_botao;
-    botoes.botoes2[0].altura = altura_botao;
-    botoes.botoes2[0].acao = MODO_POLIGONO_ABERTO;
-
-    strcpy(botoes.botoes2[1].texto, "Poligono Fechado");
-    botoes.botoes2[1].x = margem;
-    botoes.botoes2[1].y = y_inicio_grupo2 + (altura_botao + espacamento);
-    botoes.botoes2[1].largura = largura_botao;
-    botoes.botoes2[1].altura = altura_botao;
-    botoes.botoes2[1].acao = MODO_POLIGONO_FECHADO;
-
-    // === BOTÕES DE CURVA (Grupo 3) ===
-    int y_inicio_grupo3 = y_inicio_grupo2 + 2 * (altura_botao + espacamento) + altura_janela * 0.03;
-
-    strcpy(botoes.botoes3[0].texto, "Hermite");
-    botoes.botoes3[0].x = margem;
-    botoes.botoes3[0].y = y_inicio_grupo3;
-    botoes.botoes3[0].largura = largura_botao;
-    botoes.botoes3[0].altura = altura_botao;
-    botoes.botoes3[0].acao = MODO_CURVA_HERMITE;
-
-    strcpy(botoes.botoes3[1].texto, "Catmull-Rom");
-    botoes.botoes3[1].x = margem;
-    botoes.botoes3[1].y = y_inicio_grupo3 + (altura_botao + espacamento);
-    botoes.botoes3[1].largura = largura_botao;
-    botoes.botoes3[1].altura = altura_botao;
-    botoes.botoes3[1].acao = MODO_CURVA_CATMULLROM;
-
-    strcpy(botoes.botoes3[2].texto, "B-Spline");
-    botoes.botoes3[2].x = margem;
-    botoes.botoes3[2].y = y_inicio_grupo3 + 2 * (altura_botao + espacamento);
-    botoes.botoes3[2].largura = largura_botao;
-    botoes.botoes3[2].altura = altura_botao;
-    botoes.botoes3[2].acao = MODO_CURVA_BSPLINE;
-
-    strcpy(botoes.botoes3[3].texto, "Bezier");
-    botoes.botoes3[3].x = margem;
-    botoes.botoes3[3].y = y_inicio_grupo3 + 3 * (altura_botao + espacamento);
-    botoes.botoes3[3].largura = largura_botao;
-    botoes.botoes3[3].altura = altura_botao;
-    botoes.botoes3[3].acao = MODO_CURVA_BEZIER;
-
-    // === BOTÕES DE OPERAÇÃO (Grupo 4) ===
-    int y_inicio_grupo4 = y_inicio_grupo3 + 4 * (altura_botao + espacamento) + altura_janela * 0.03;
-
-    strcpy(botoes_operacoes[0].texto, "Translacao");
-    botoes_operacoes[0].x = margem;
-    botoes_operacoes[0].y = y_inicio_grupo4;
-    botoes_operacoes[0].largura = largura_botao;
-    botoes_operacoes[0].altura = altura_botao;
-    botoes_operacoes[0].acao = TRANSLACAO;
-
-    strcpy(botoes_operacoes[1].texto, "Rotacao");
-    botoes_operacoes[1].x = margem;
-    botoes_operacoes[1].y = y_inicio_grupo4 + (altura_botao + espacamento);
-    botoes_operacoes[1].largura = largura_botao;
-    botoes_operacoes[1].altura = altura_botao;
-    botoes_operacoes[1].acao = ROTACAO;
-
-    strcpy(botoes_operacoes[2].texto, "Escala");
-    botoes_operacoes[2].x = margem;
-    botoes_operacoes[2].y = y_inicio_grupo4 + 2 * (altura_botao + espacamento);
-    botoes_operacoes[2].largura = largura_botao;
-    botoes_operacoes[2].altura = altura_botao;
-    botoes_operacoes[2].acao = ESCALA;
-
-    strcpy(botoes_operacoes[3].texto, "Shear");
-    botoes_operacoes[3].x = margem;
-    botoes_operacoes[3].y = y_inicio_grupo4 + 3 * (altura_botao + espacamento);
-    botoes_operacoes[3].largura = largura_botao;
-    botoes_operacoes[3].altura = altura_botao;
-    botoes_operacoes[3].acao = SHEAR;
+static int slider_visivel(void){
+  return estado_atual.criacao_ou_selecao == MODO_SELECIONAR_CURVA;
 }
 
-void inicializar_menu() {
-    atualizar_dimensoes_menu();
+float obter_rigidez_movimento(void){
+  return estado_atual.rigidez_movimento;
 }
 
-void desenhar_texto(float x, float y, void *font, const char *texto, float escala) {
-    glPushMatrix();
-    glTranslatef(x, y, 0.0f);
-    glScalef(escala, escala, 1.0f);
-
-    for (const char *c = texto; *c != '\0'; c++) {
-        glutStrokeCharacter(font, *c);
-    }
-
-    glPopMatrix();
+float obter_limiar_densidade(void){
+  return estado_atual.limiar_distancia_controles;
 }
 
-void desenhar_botao_generico(void *botao, TipoBotao tipo, int indice) {
-    int x, y, largura, altura;
-    char *texto;
-    int ativo = 0;
-    int destacado = 0;
+unsigned obter_revisao_densidade(void){
+  return estado_atual.revisao_densidade;
+}
 
-    switch (tipo) {
-    case TIPO_BOTAO1: {
-        Botoes1 *b = (Botoes1 *)botao;
-        x = b->x; y = b->y; largura = b->largura; altura = b->altura;
-        texto = b->texto; destacado = b->destacado;
-        ativo = (estado_atual.criacao_ou_selecao == b->acao);
-        break;
-    }
-    case TIPO_BOTAO2: {
-        Botoes2 *b = (Botoes2 *)botao;
-        x = b->x; y = b->y; largura = b->largura; altura = b->altura;
-        texto = b->texto; destacado = b->destacado;
-        ativo = (estado_atual.poligono == b->acao);
-        break;
-    }
-    case TIPO_BOTAO3: {
-        Botoes3 *b = (Botoes3 *)botao;
-        x = b->x; y = b->y; largura = b->largura; altura = b->altura;
-        texto = b->texto; destacado = b->destacado;
-        ativo = (estado_atual.curva == b->acao);
-        break;
-    }
-    case TIPO_OPERACAO: {
-        BotoesOperacoes *b = (BotoesOperacoes *)botao;
-        x = b->x; y = b->y; largura = b->largura; altura = b->altura;
-        texto = b->texto; destacado = b->destacado;
-        ativo = (estado_atual.operacao == b->acao);
-        break;
-    }
-    }
+void atualizar_dimensoes_menu(){
+  int altura_janela = glutGet(GLUT_WINDOW_HEIGHT);
+  int largura_janela = glutGet(GLUT_WINDOW_WIDTH);
+  // Menu ocupa 15% da largura ou mínimo 150px.
+  menu_largura = (largura_janela * 0.15 < 150) ? 150 : largura_janela * 0.15;
 
-    if (ativo) glColor3f(0.2f, 0.7f, 0.2f);
-    else if (destacado) glColor3f(0.9f, 0.9f, 0.7f);
-    else glColor3f(0.95f, 0.95f, 0.95f);
+  int margem = menu_largura * 0.05;
+  int largura_botao = menu_largura - (2 * margem);
+  int altura_botao = altura_janela * 0.03; // 3% da altura da janela
+  int espacamento = altura_janela * 0.01;  // 1% da altura da janela
 
+  botao_benchmark = (BotaoBenchmark){margem, altura_janela - altura_botao - margem,
+                                     largura_botao, altura_botao, 0};
+
+  menu_altura_fonte = altura_botao * 0.45f;
+  menu_escala_fonte = (largura_botao * 0.09f) / 121.05f;
+  info_escala_fonte = (largura_botao * 0.05f) / 121.0f;
+
+  // Painel de status: canto inferior direito do menu.
+  const int painel_margem = margem / 2;
+  const int painel_espacamento = espacamento / 2;
+  const int item_altura = altura_botao * 0.9;
+  const int y_base = painel_margem;
+
+  strcpy(info[0].texto, "Pontos de controle: 0");
+  strcpy(info[0].tooltip, "Qtd de pontos de controle.");
+  info[0].x = painel_margem;
+  info[0].y = y_base + item_altura + painel_espacamento;
+  info[0].largura =
+      calcular_largura_texto_stroke(menu_fonte_stroke, info[0].texto, info_escala_fonte);
+  info[0].larguratooltip =
+      calcular_largura_texto_stroke(menu_fonte_stroke, info[0].tooltip, info_escala_fonte);
+  info[0].altura = calcular_altura_fonte_stroke(menu_escala_fonte);
+
+  strcpy(info[1].texto, "Nuvem de pontos: 0");
+  strcpy(info[1].tooltip, "Qtd de pontos da curva atual.");
+  info[1].x = painel_margem;
+  info[1].y = y_base;
+  info[1].largura =
+      calcular_largura_texto_stroke(menu_fonte_stroke, info[0].texto, info_escala_fonte);
+  info[1].larguratooltip =
+      calcular_largura_texto_stroke(menu_fonte_stroke, info[0].tooltip, info_escala_fonte);
+  info[1].altura = calcular_altura_fonte_stroke(menu_escala_fonte);
+  // === BOTÕES DE CRIAÇÃO/SELEÇÃO (Grupo 1) ===
+  int y_inicio_grupo1 = altura_janela * 0.05;
+  strcpy(botoes.botoes1[0].texto, "Criar Ponto");
+  botoes.botoes1[0].x = margem;
+  botoes.botoes1[0].y = y_inicio_grupo1;
+  botoes.botoes1[0].largura = largura_botao;
+  botoes.botoes1[0].altura = altura_botao;
+  botoes.botoes1[0].acao = MODO_CRIAR_PONTO;
+
+  strcpy(botoes.botoes1[1].texto, "Apagar Ponto");
+  botoes.botoes1[1].x = margem;
+  botoes.botoes1[1].y = y_inicio_grupo1 + (altura_botao + espacamento);
+  botoes.botoes1[1].largura = largura_botao;
+  botoes.botoes1[1].altura = altura_botao;
+  botoes.botoes1[1].acao = MODO_APAGAR_PONTO;
+
+  strcpy(botoes.botoes1[2].texto, "Selecionar ponto");
+  botoes.botoes1[2].x = margem;
+  botoes.botoes1[2].y = y_inicio_grupo1 + 2 * (altura_botao + espacamento);
+  botoes.botoes1[2].largura = largura_botao;
+  botoes.botoes1[2].altura = altura_botao;
+  botoes.botoes1[2].acao = MODO_SELECIONAR_PONTO;
+
+  strcpy(botoes.botoes1[3].texto, "Operar forma");
+  botoes.botoes1[3].x = margem;
+  botoes.botoes1[3].y = y_inicio_grupo1 + 3 * (altura_botao + espacamento);
+  botoes.botoes1[3].largura = largura_botao;
+  botoes.botoes1[3].altura = altura_botao;
+  botoes.botoes1[3].acao = MODO_SELECIONAR_POLIGONO;
+
+  strcpy(botoes.botoes1[4].texto, "Selecionar Curva");
+  botoes.botoes1[4].x = margem;
+  botoes.botoes1[4].y = y_inicio_grupo1 + 4 * (altura_botao + espacamento);
+  botoes.botoes1[4].largura = largura_botao;
+  botoes.botoes1[4].altura = altura_botao;
+  botoes.botoes1[4].acao = MODO_SELECIONAR_CURVA;
+
+  slider_rigidez.x = margem;
+  slider_rigidez.y = y_inicio_grupo1 + 5 * (altura_botao + espacamento);
+  slider_rigidez.largura = largura_botao;
+  slider_rigidez.altura = altura_botao / 2;
+  slider_rigidez.destacado = 0;
+  slider_rigidez.arrastando = 0;
+
+  seletor_densidade.x = margem;
+  seletor_densidade.y = slider_rigidez.y + slider_rigidez.altura + 2 * espacamento;
+  seletor_densidade.largura = largura_botao < 100 ? largura_botao : 100;
+  seletor_densidade.altura = 20;
+  seletor_densidade.posicao_hover = -1;
+
+  botao_anti_autointerferencia.x = margem;
+  botao_anti_autointerferencia.y = seletor_densidade.y + seletor_densidade.altura + espacamento;
+  botao_anti_autointerferencia.largura = largura_botao;
+  botao_anti_autointerferencia.altura = altura_botao;
+  botao_anti_autointerferencia.destacado = 0;
+  strcpy(botao_anti_autointerferencia.texto, "Anti-autointerferencia");
+
+  // === BOTÕES DE POLÍGONO (Grupo 2) ===
+  int y_inicio_grupo2 = botao_anti_autointerferencia.y + botao_anti_autointerferencia.altura +
+                         altura_janela * 0.03;
+
+  strcpy(botoes.botoes2[0].texto, "Poligono Aberto");
+  botoes.botoes2[0].x = margem;
+  botoes.botoes2[0].y = y_inicio_grupo2;
+  botoes.botoes2[0].largura = largura_botao;
+  botoes.botoes2[0].altura = altura_botao;
+  botoes.botoes2[0].acao = MODO_POLIGONO_ABERTO;
+
+  strcpy(botoes.botoes2[1].texto, "Poligono Fechado");
+  botoes.botoes2[1].x = margem;
+  botoes.botoes2[1].y = y_inicio_grupo2 + (altura_botao + espacamento);
+  botoes.botoes2[1].largura = largura_botao;
+  botoes.botoes2[1].altura = altura_botao;
+  botoes.botoes2[1].acao = MODO_POLIGONO_FECHADO;
+
+  // === BOTÕES DE CURVA (Grupo 3) ===
+  int y_inicio_grupo3 = y_inicio_grupo2 + 2 * (altura_botao + espacamento) + altura_janela * 0.03;
+
+  strcpy(botoes.botoes3[0].texto, "Hermite");
+  botoes.botoes3[0].x = margem;
+  botoes.botoes3[0].y = y_inicio_grupo3;
+  botoes.botoes3[0].largura = largura_botao;
+  botoes.botoes3[0].altura = altura_botao;
+  botoes.botoes3[0].acao = MODO_CURVA_HERMITE;
+
+  strcpy(botoes.botoes3[1].texto, "Catmull-Rom");
+  botoes.botoes3[1].x = margem;
+  botoes.botoes3[1].y = y_inicio_grupo3 + (altura_botao + espacamento);
+  botoes.botoes3[1].largura = largura_botao;
+  botoes.botoes3[1].altura = altura_botao;
+  botoes.botoes3[1].acao = MODO_CURVA_CATMULLROM;
+
+  strcpy(botoes.botoes3[2].texto, "B-Spline");
+  botoes.botoes3[2].x = margem;
+  botoes.botoes3[2].y = y_inicio_grupo3 + 2 * (altura_botao + espacamento);
+  botoes.botoes3[2].largura = largura_botao;
+  botoes.botoes3[2].altura = altura_botao;
+  botoes.botoes3[2].acao = MODO_CURVA_BSPLINE;
+
+  strcpy(botoes.botoes3[3].texto, "Bezier");
+  botoes.botoes3[3].x = margem;
+  botoes.botoes3[3].y = y_inicio_grupo3 + 3 * (altura_botao + espacamento);
+  botoes.botoes3[3].largura = largura_botao;
+  botoes.botoes3[3].altura = altura_botao;
+  botoes.botoes3[3].acao = MODO_CURVA_BEZIER;
+
+  // === BOTÕES DE OPERAÇÃO (Grupo 4) ===
+  int y_inicio_grupo4 = y_inicio_grupo3 + 4 * (altura_botao + espacamento) + altura_janela * 0.03;
+
+  strcpy(botoes_operacoes[0].texto, "Translacao");
+  botoes_operacoes[0].x = margem;
+  botoes_operacoes[0].y = y_inicio_grupo4;
+  botoes_operacoes[0].largura = largura_botao;
+  botoes_operacoes[0].altura = altura_botao;
+  botoes_operacoes[0].acao = TRANSLACAO;
+
+  strcpy(botoes_operacoes[1].texto, "Rotacao");
+  botoes_operacoes[1].x = margem;
+  botoes_operacoes[1].y = y_inicio_grupo4 + (altura_botao + espacamento);
+  botoes_operacoes[1].largura = largura_botao;
+  botoes_operacoes[1].altura = altura_botao;
+  botoes_operacoes[1].acao = ROTACAO;
+
+  strcpy(botoes_operacoes[2].texto, "Escala");
+  botoes_operacoes[2].x = margem;
+  botoes_operacoes[2].y = y_inicio_grupo4 + 2 * (altura_botao + espacamento);
+  botoes_operacoes[2].largura = largura_botao;
+  botoes_operacoes[2].altura = altura_botao;
+  botoes_operacoes[2].acao = ESCALA;
+
+  strcpy(botoes_operacoes[3].texto, "Shear");
+  botoes_operacoes[3].x = margem;
+  botoes_operacoes[3].y = y_inicio_grupo4 + 3 * (altura_botao + espacamento);
+  botoes_operacoes[3].largura = largura_botao;
+  botoes_operacoes[3].altura = altura_botao;
+  botoes_operacoes[3].acao = SHEAR;
+}
+
+void inicializar_menu(){
+  atualizar_dimensoes_menu();
+}
+
+void desenhar_texto(float x, float y, void *font, const char *texto, float escala){
+  glPushMatrix();
+  glTranslatef(x, y, 0.0f);
+  glScalef(escala, escala, 1.0f);
+
+  for(const char *c = texto; *c != '\0'; c++){
+    glutStrokeCharacter(font, *c);
+  }
+
+  glPopMatrix();
+}
+
+void desenhar_botao_generico(void *botao, TipoBotao tipo, int indice){
+  (void)indice;
+  int x, y, largura, altura;
+  char *texto;
+  int ativo = 0;
+  int destacado = 0;
+
+  switch(tipo){
+  case TIPO_BOTAO1: {
+    Botoes1 *b = (Botoes1 *)botao;
+    x = b->x;
+    y = b->y;
+    largura = b->largura;
+    altura = b->altura;
+    texto = b->texto;
+    destacado = b->destacado;
+    ativo = (estado_atual.criacao_ou_selecao == b->acao);
+    break;
+  }
+  case TIPO_BOTAO2: {
+    Botoes2 *b = (Botoes2 *)botao;
+    x = b->x;
+    y = b->y;
+    largura = b->largura;
+    altura = b->altura;
+    texto = b->texto;
+    destacado = b->destacado;
+    ativo = (estado_atual.poligono == b->acao);
+    break;
+  }
+  case TIPO_BOTAO3: {
+    Botoes3 *b = (Botoes3 *)botao;
+    x = b->x;
+    y = b->y;
+    largura = b->largura;
+    altura = b->altura;
+    texto = b->texto;
+    destacado = b->destacado;
+    ativo = (estado_atual.curva == b->acao);
+    break;
+  }
+  case TIPO_OPERACAO: {
+    BotoesOperacoes *b = (BotoesOperacoes *)botao;
+    x = b->x;
+    y = b->y;
+    largura = b->largura;
+    altura = b->altura;
+    texto = b->texto;
+    destacado = b->destacado;
+    ativo = (estado_atual.operacao == b->acao);
+    break;
+  }
+  default:
+    return;
+  }
+
+  if(ativo){
+    glColor3f(0.2f, 0.7f, 0.2f);
+  } else if(destacado){
+    glColor3f(0.9f, 0.9f, 0.7f);
+  } else {
+    glColor3f(0.95f, 0.95f, 0.95f);
+  }
+
+  glBegin(GL_QUADS);
+  glVertex2f(x, y);
+  glVertex2f(x + largura, y);
+  glVertex2f(x + largura, y + altura);
+  glVertex2f(x, y + altura);
+  glEnd();
+
+  glColor3f(0.0f, 0.0f, 0.0f);
+  glLineWidth(1.0f);
+  glBegin(GL_LINE_LOOP);
+  glVertex2f(x, y);
+  glVertex2f(x + largura, y);
+  glVertex2f(x + largura, y + altura);
+  glVertex2f(x, y + altura);
+  glEnd();
+
+  float texto_largura = calcular_largura_texto_stroke(menu_fonte_stroke, texto, menu_escala_fonte);
+  float texto_altura = calcular_altura_fonte_stroke(menu_escala_fonte);
+  float texto_x = x + (largura - texto_largura) / 2.0f;
+  float texto_y = y + (altura - texto_altura) / 2.0f;
+  desenhar_texto(texto_x, texto_y, menu_fonte_stroke, texto, menu_escala_fonte);
+}
+
+void desenhar_botoes_menu(){
+  glColor3f(botao_benchmark.destacado ? 0.9f : 0.95f, botao_benchmark.destacado ? 0.9f : 0.95f,
+            botao_benchmark.destacado ? 0.7f : 0.95f);
+  glBegin(GL_QUADS);
+  glVertex2f(botao_benchmark.x, botao_benchmark.y);
+  glVertex2f(botao_benchmark.x + botao_benchmark.largura, botao_benchmark.y);
+  glVertex2f(botao_benchmark.x + botao_benchmark.largura, botao_benchmark.y + botao_benchmark.altura);
+  glVertex2f(botao_benchmark.x, botao_benchmark.y + botao_benchmark.altura);
+  glEnd();
+  glColor3f(0, 0, 0);
+  glBegin(GL_LINE_LOOP);
+  glVertex2f(botao_benchmark.x, botao_benchmark.y);
+  glVertex2f(botao_benchmark.x + botao_benchmark.largura, botao_benchmark.y);
+  glVertex2f(botao_benchmark.x + botao_benchmark.largura, botao_benchmark.y + botao_benchmark.altura);
+  glVertex2f(botao_benchmark.x, botao_benchmark.y + botao_benchmark.altura);
+  glEnd();
+  desenhar_texto(botao_benchmark.x + 8, botao_benchmark.y + 7, menu_fonte_stroke, "Benchmark", menu_escala_fonte);
+  for(int i = 0; i < 5; i++){
+    desenhar_botao_generico(&botoes.botoes1[i], TIPO_BOTAO1, i);
+  }
+  for(int i = 0; i < 2; i++){
+    desenhar_botao_generico(&botoes.botoes2[i], TIPO_BOTAO2, i);
+  }
+  for(int i = 0; i < 4; i++){
+    desenhar_botao_generico(&botoes.botoes3[i], TIPO_BOTAO3, i);
+  }
+
+  if(estado_atual.criacao_ou_selecao == MODO_SELECIONAR_POLIGONO){
+    for(int i = 0; i < 4; i++){
+      desenhar_botao_generico(&botoes_operacoes[i], TIPO_OPERACAO, i);
+    }
+  } else if(estado_atual.criacao_ou_selecao == MODO_SELECIONAR_PONTO){
+    desenhar_botao_generico(&botoes_operacoes[0], TIPO_OPERACAO, 0);
+    estado_atual.operacao = TRANSLACAO;
+  }
+
+  if(slider_visivel()){
+    char valor[32];
+    snprintf(valor, sizeof(valor), "Rigidez: %.2f", estado_atual.rigidez_movimento);
+    desenhar_texto((float)slider_rigidez.x, (float)(slider_rigidez.y + slider_rigidez.altura + 5),
+                   menu_fonte_stroke, valor, info_escala_fonte);
+
+    glColor3f(0.25f, 0.25f, 0.25f);
     glBegin(GL_QUADS);
-    glVertex2f(x, y); glVertex2f(x + largura, y);
-    glVertex2f(x + largura, y + altura); glVertex2f(x, y + altura);
+    glVertex2f(slider_rigidez.x, slider_rigidez.y);
+    glVertex2f(slider_rigidez.x + slider_rigidez.largura, slider_rigidez.y);
+    glVertex2f(slider_rigidez.x + slider_rigidez.largura, slider_rigidez.y + slider_rigidez.altura);
+    glVertex2f(slider_rigidez.x, slider_rigidez.y + slider_rigidez.altura);
     glEnd();
 
-    glColor3f(0.0f, 0.0f, 0.0f);
-    glLineWidth(1.0f);
-    glBegin(GL_LINE_LOOP);
-    glVertex2f(x, y); glVertex2f(x + largura, y);
-    glVertex2f(x + largura, y + altura); glVertex2f(x, y + altura);
+    int cursor = slider_x_por_valor(estado_atual.rigidez_movimento, slider_rigidez.x,
+                                    slider_rigidez.largura);
+    glColor3f(slider_rigidez.destacado || slider_rigidez.arrastando ? 0.95f : 0.75f, 0.55f, 0.15f);
+    glBegin(GL_QUADS);
+    glVertex2f(slider_rigidez.x, slider_rigidez.y);
+    glVertex2f(cursor, slider_rigidez.y);
+    glVertex2f(cursor, slider_rigidez.y + slider_rigidez.altura);
+    glVertex2f(slider_rigidez.x, slider_rigidez.y + slider_rigidez.altura);
     glEnd();
 
-    float texto_largura = calcular_largura_texto_stroke(menu_fonte_stroke, texto, menu_escala_fonte);
-    float texto_altura = calcular_altura_fonte_stroke(menu_escala_fonte);
-    float texto_x = x + (largura - texto_largura) / 2.0f;
-    float texto_y = y + (altura - texto_altura) / 2.0f;
-    desenhar_texto(texto_x, texto_y, menu_fonte_stroke, texto, menu_escala_fonte);
-}
-
-void desenhar_botoes_menu() {
-    for (int i = 0; i < 5; i++) desenhar_botao_generico(&botoes.botoes1[i], TIPO_BOTAO1, i);
-    for (int i = 0; i < 2; i++) desenhar_botao_generico(&botoes.botoes2[i], TIPO_BOTAO2, i);
-    for (int i = 0; i < 4; i++) desenhar_botao_generico(&botoes.botoes3[i], TIPO_BOTAO3, i);
-
-    if (estado_atual.criacao_ou_selecao == MODO_SELECIONAR_POLIGONO) {
-        for (int i = 0; i < 4; i++) desenhar_botao_generico(&botoes_operacoes[i], TIPO_OPERACAO, i);
-    } else if (estado_atual.criacao_ou_selecao == MODO_SELECIONAR_PONTO) {
-        desenhar_botao_generico(&botoes_operacoes[0], TIPO_OPERACAO, 0);
-        estado_atual.operacao = TRANSLACAO;
+    glColor3f(0.05f, 0.05f, 0.05f);
+    glBegin(GL_QUADS);
+    glVertex2f(cursor - 3, slider_rigidez.y - 4);
+    glVertex2f(cursor + 3, slider_rigidez.y - 4);
+    glVertex2f(cursor + 3, slider_rigidez.y + slider_rigidez.altura + 4);
+    glVertex2f(cursor - 3, slider_rigidez.y + slider_rigidez.altura + 4);
+    glEnd();
+    if(slider_rigidez.destacado || slider_rigidez.arrastando){
+      desenhar_tooltip_rigidez();
     }
+  }
+
+  desenhar_texto((float)seletor_densidade.x,
+                   (float)(seletor_densidade.y + seletor_densidade.altura + 5), menu_fonte_stroke,
+                   "Densidade de controle", info_escala_fonte);
+    glColor3f(0.25f, 0.25f, 0.25f);
+    glBegin(GL_QUADS);
+    glVertex2f(seletor_densidade.x, seletor_densidade.y);
+    glVertex2f(seletor_densidade.x + seletor_densidade.largura, seletor_densidade.y);
+    glVertex2f(seletor_densidade.x + seletor_densidade.largura,
+               seletor_densidade.y + seletor_densidade.altura);
+    glVertex2f(seletor_densidade.x, seletor_densidade.y + seletor_densidade.altura);
+    glEnd();
+
+    const float largura_slot = (float)seletor_densidade.largura / DENSIDADE_POSICOES;
+    glPointSize(8.0f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    for(int i = 0; i < DENSIDADE_POSICOES; i++){
+      float centro_x = seletor_densidade.x + (i + 0.5f) * largura_slot;
+      float centro_y = seletor_densidade.y + seletor_densidade.altura * 0.5f;
+      if(i == seletor_densidade.posicao_hover && i != estado_atual.posicao_densidade){
+        glColor4f(1.0f, 0.0f, 0.0f, 0.45f);
+        glBegin(GL_POINTS);
+        glVertex2f(centro_x, centro_y);
+        glEnd();
+      }
+      if(i == estado_atual.posicao_densidade){
+        glColor3f(0.9f, 0.0f, 0.0f);
+        glBegin(GL_POINTS);
+        glVertex2f(centro_x, centro_y);
+        glEnd();
+      }
+      glColor3f(0.05f, 0.05f, 0.05f);
+      glBegin(GL_LINES);
+      glVertex2f(seletor_densidade.x + i * largura_slot, seletor_densidade.y);
+      glVertex2f(seletor_densidade.x + i * largura_slot,
+                 seletor_densidade.y + seletor_densidade.altura);
+      glEnd();
+    }
+  glDisable(GL_BLEND);
+  glPointSize(7.0f);
+
+  if(estado_atual.criacao_ou_selecao == MODO_SELECIONAR_CURVA &&
+     estado_atual.curva == MODO_CURVA_BSPLINE){
+    BotaoAntiAutointerferencia *botao = &botao_anti_autointerferencia;
+    if(estado_atual.anti_autointerferencia){
+      glColor3f(0.2f, 0.7f, 0.2f);
+    } else if(botao->destacado){
+      glColor3f(0.9f, 0.9f, 0.7f);
+    } else {
+      glColor3f(0.95f, 0.95f, 0.95f);
+    }
+    glBegin(GL_QUADS);
+    glVertex2f(botao->x, botao->y);
+    glVertex2f(botao->x + botao->largura, botao->y);
+    glVertex2f(botao->x + botao->largura, botao->y + botao->altura);
+    glVertex2f(botao->x, botao->y + botao->altura);
+    glEnd();
+    glColor3f(0.0f, 0.0f, 0.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(botao->x, botao->y);
+    glVertex2f(botao->x + botao->largura, botao->y);
+    glVertex2f(botao->x + botao->largura, botao->y + botao->altura);
+    glVertex2f(botao->x, botao->y + botao->altura);
+    glEnd();
+    float largura = calcular_largura_texto_stroke(menu_fonte_stroke, botao->texto,
+                                                   menu_escala_fonte);
+    desenhar_texto(botao->x + (botao->largura - largura) / 2.0f,
+                   botao->y + (botao->altura - menu_altura_fonte) / 2.0f,
+                   menu_fonte_stroke, botao->texto, menu_escala_fonte);
+  }
 }
 
-float calcular_largura_texto_stroke(void *font, const char *texto, float escala) {
-    float largura = 0.0f;
-    for (const char *c = texto; *c != '\0'; c++) largura += glutStrokeWidth(font, *c);
-    return largura * escala;
+int botao_anti_autointerferencia_contem(int x, int y){
+  return x >= botao_anti_autointerferencia.x &&
+         x <= botao_anti_autointerferencia.x + botao_anti_autointerferencia.largura &&
+         y >= botao_anti_autointerferencia.y &&
+         y <= botao_anti_autointerferencia.y + botao_anti_autointerferencia.altura;
 }
 
-float calcular_altura_fonte_stroke(float escala) {
-    return 119.05f * escala;
+int botao_benchmark_contem(int x, int y){
+  return x >= botao_benchmark.x && x <= botao_benchmark.x + botao_benchmark.largura &&
+         y >= botao_benchmark.y && y <= botao_benchmark.y + botao_benchmark.altura;
+}
+
+float calcular_largura_texto_stroke(void *font, const char *texto, float escala){
+  float largura = 0.0f;
+  for(const char *c = texto; *c != '\0'; c++){
+    largura += glutStrokeWidth(font, *c);
+  }
+  return largura * escala;
+}
+
+float calcular_altura_fonte_stroke(float escala){
+  return 119.05f * escala;
 }
 
 void recalcula_dimensoes_info(){
-  for (int i = 0; i < 2; i++) {
-    info[i].largura = calcular_largura_texto_stroke(menu_fonte_stroke, info[i].texto, info_escala_fonte);
+  for(int i = 0; i < 2; i++){
+    info[i].largura =
+        calcular_largura_texto_stroke(menu_fonte_stroke, info[i].texto, info_escala_fonte);
     info[i].altura = calcular_altura_fonte_stroke(info_escala_fonte);
   }
 }
 
 void atualiza_info(){
-  snprintf(info[0].texto, sizeof(info[0].texto), "Pontos de controle: %s", estado_atual.qtd_pontos_controle);
-  snprintf(info[1].texto, sizeof(info[1].texto), "Nuvem de pontos: %s", estado_atual.qtd_nuvem_pontos);
+  snprintf(info[0].texto, sizeof(info[0].texto), "Pontos de controle: %s",
+           estado_atual.qtd_pontos_controle);
+  snprintf(info[1].texto, sizeof(info[1].texto), "Nuvem de pontos: %s",
+           estado_atual.qtd_nuvem_pontos);
 }
 
-static void desenhar_retangulo_info(const InfoItem *item) {
+static void desenhar_retangulo_info(const InfoItem *item){
   const float largura = item->largura + 16.0f;
   const float altura = 22.0f;
   const float x = item->x - 8.0f;
@@ -292,61 +513,148 @@ static void desenhar_retangulo_info(const InfoItem *item) {
 
   glColor3f(0.12f, 0.12f, 0.12f);
   glBegin(GL_QUADS);
-  glVertex2f(x, y); glVertex2f(x + largura, y);
-  glVertex2f(x + largura, y + altura); glVertex2f(x, y + altura);
+  glVertex2f(x, y);
+  glVertex2f(x + largura, y);
+  glVertex2f(x + largura, y + altura);
+  glVertex2f(x, y + altura);
   glEnd();
 }
 
-static void desenhar_tooltip(const InfoItem *item) {
+static void desenhar_tooltip(const InfoItem *item){
   const float margem = 7.0f;
   const float altura = 28.0f;
-  const float largura_texto = calcular_largura_texto_stroke(menu_fonte_stroke, item->tooltip, info_escala_fonte);
+  const float largura_texto =
+      calcular_largura_texto_stroke(menu_fonte_stroke, item->tooltip, info_escala_fonte);
   float x = item->x;
   float y = item->y + item->altura + 6.0f;
 
-  if (x < 4.0f) x = 4.0f;
+  if(x < 4.0f){
+    x = 4.0f;
+  }
   const int altura_janela = glutGet(GLUT_WINDOW_HEIGHT);
-  if (y + altura > altura_janela - 4.0f) y = item->y - altura - 6.0f;
+  if(y + altura > altura_janela - 4.0f){
+    y = item->y - altura - 6.0f;
+  }
 
   glColor3f(0.05f, 0.05f, 0.05f);
   glBegin(GL_QUADS);
-  glVertex2f(x, y); glVertex2f(x + largura_texto + 2.0f * margem, y);
-  glVertex2f(x + largura_texto + 2.0f * margem, y + altura); glVertex2f(x, y + altura);
+  glVertex2f(x, y);
+  glVertex2f(x + largura_texto + 2.0f * margem, y);
+  glVertex2f(x + largura_texto + 2.0f * margem, y + altura);
+  glVertex2f(x, y + altura);
   glEnd();
 
   glColor3f(1.0f, 1.0f, 1.0f);
   desenhar_texto(x, y + 7.0f, menu_fonte_stroke, item->tooltip, info_escala_fonte);
 }
 
+static void desenhar_tooltip_rigidez(void){
+  static const char *linhas[] = {
+      "Rigidez de movimento:", "define o quanto a", "deformacao se concentra",
+      "perto do ponto arrastado.", "Em 0, a curva se move", "de forma suave e distribuida,",
+      "seguindo o peso natural", "da base da B-spline.", "Em 1, os pontos distantes",
+      "do clique quase nao se movem,", "concentrando a deformacao",
+      "ao redor do ponto arrastado."};
+  const int quantidade_linhas = (int)(sizeof(linhas) / sizeof(linhas[0]));
+  const float margem = 7.0f;
+  const float altura_linha = 16.0f;
+  float largura = 0.0f;
+  for(int i = 0; i < quantidade_linhas; i++){
+    float atual = calcular_largura_texto_stroke(menu_fonte_stroke, linhas[i], info_escala_fonte);
+    if(atual > largura){
+      largura = atual;
+    }
+  }
+  float x = 4.0f;
+  float y = slider_rigidez.y + slider_rigidez.altura + 10.0f;
+  float altura = quantidade_linhas * altura_linha + 2.0f * margem;
+  if(y + altura > glutGet(GLUT_WINDOW_HEIGHT) - 4.0f){
+    y = slider_rigidez.y - altura - 8.0f;
+  }
+
+  glColor3f(0.05f, 0.05f, 0.05f);
+  glBegin(GL_QUADS);
+  glVertex2f(x, y);
+  glVertex2f(x + largura + 2.0f * margem, y);
+  glVertex2f(x + largura + 2.0f * margem, y + altura);
+  glVertex2f(x, y + altura);
+  glEnd();
+  glColor3f(1.0f, 1.0f, 1.0f);
+  for(int i = 0; i < quantidade_linhas; i++){
+    desenhar_texto(x + margem, y + altura - margem - (i + 1) * altura_linha,
+                   menu_fonte_stroke, linhas[i], info_escala_fonte);
+  }
+}
+
 void desenhar_info(){
   atualiza_info();
   recalcula_dimensoes_info();
-  
-  for (int i = 0; i < 2; i++) {
-    if (info[i].destacado) {
+
+  for(int i = 0; i < 2; i++){
+    if(info[i].destacado){
       desenhar_tooltip(&info[i]);
       desenhar_retangulo_info(&info[i]);
       glColor3f(0.9f, 0.9f, 0.9f);
     } else {
       glColor3f(0.0f, 0.0f, 0.0f);
     }
-    desenhar_texto((float)info[i].x, (float)info[i].y, menu_fonte_stroke, info[i].texto, info_escala_fonte );
+    desenhar_texto((float)info[i].x, (float)info[i].y, menu_fonte_stroke, info[i].texto,
+                   info_escala_fonte);
   }
-
 }
 
-void processar_mouse_move_info(int x, int y) {
+int processar_arrasto_menu(int x, int y){
+  (void)y;
+  if(!slider_rigidez.arrastando || !slider_visivel()){
+    return 0;
+  }
+  float novo_valor = slider_valor_por_x(x, slider_rigidez.x, slider_rigidez.largura);
+  if(novo_valor != estado_atual.rigidez_movimento){
+    estado_atual.rigidez_movimento = novo_valor;
+    glutPostRedisplay();
+  }
+  return 1;
+}
+
+int finalizar_arrasto_menu(void){
+  if(!slider_rigidez.arrastando){
+    return 0;
+  }
+  slider_rigidez.arrastando = 0;
+  glutPostRedisplay();
+  return 1;
+}
+
+void processar_mouse_move_menu(int x, int y){
+  int destacado = slider_visivel() && slider_contem(&slider_rigidez, x, y);
+  if(slider_rigidez.destacado != destacado){
+    slider_rigidez.destacado = destacado;
+    glutPostRedisplay();
+  }
+  if(!slider_visivel()){
+    slider_rigidez.arrastando = 0;
+  }
+  int novo_hover = densidade_contem(&seletor_densidade, x, y)
+                       ? densidade_posicao_por_x(x, seletor_densidade.x, seletor_densidade.largura)
+                       : -1;
+  if(seletor_densidade.posicao_hover != novo_hover){
+    seletor_densidade.posicao_hover = novo_hover;
+    glutPostRedisplay();
+  }
+}
+
+void processar_mouse_move_info(int x, int y){
   int novo_hover = -1;
-  for (int i = 0; i < 2; i++) {
+  for(int i = 0; i < 2; i++){
     const float margem = 5.0f;
-    if (x >= info[i].x - margem && x <= info[i].x + info[i].largura + margem &&
-        y >= info[i].y - margem && y <= info[i].y + info[i].altura + margem) {
+    if(x >= info[i].x - margem && x <= info[i].x + info[i].largura + margem &&
+       y >= info[i].y - margem && y <= info[i].y + info[i].altura + margem){
       novo_hover = i;
       break;
     }
   }
 
-  if (novo_hover != info_hover) {
+  if(novo_hover != info_hover){
     info_hover = novo_hover;
     glutPostRedisplay();
   }

@@ -16,9 +16,9 @@
 #define VEC_SHRINK_THRESHOLD 5.0625
 
 typedef struct {
-    float *vector;
-    int quantidade_atual;
-    int quantidade_max;
+  float *vector;
+  int quantidade_atual;
+  int quantidade_max;
 } vec;
 
 /* Inicializa o vetor dinâmico */
@@ -37,7 +37,7 @@ int vec_push(float x, vec *v);
  * Verifica se há capacidade disponível.
  * Se quantidade_atual == quantidade_max, realoca com fator 1.5x.
  */
-void vec_ensure(vec *v);
+int vec_ensure(vec *v);
 
 /*
  * Reduz a capacidade máxima se houver folga excessiva

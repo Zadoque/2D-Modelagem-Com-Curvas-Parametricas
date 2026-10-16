@@ -1,28 +1,19 @@
 #ifndef MATRIZ_H
 #define MATRIZ_H
-#include <math.h>
 
-float *MultiplicaPonto(float *vetor, float **matriz);
+typedef struct {
+  float dados[3][3];
+} Matriz3;
 
-float **MultiplicaMatriz(float **matriz1, float **matriz2);
-
-float** CriarMatrizTranslacao(float Tx, float Ty);
-
-float** CriarMatrizEscala(float Sx, float Sy);
-
-float** CriarMatrizRotacao(float angulo);
-// Cisalhamento em X (horizontal)
-float** CriarMatrizCisalhamentoX(float shx);
-
-// Cisalhamento em Y (vertical)
-float** CriarMatrizCisalhamentoY(float shy);
-// Reflexão em relação ao eixo X
-float** CriarMatrizEspelhoX();
-
-// Reflexão em relação ao eixo Y
-float** CriarMatrizEspelhoY();
-// Reflexão em relação à origem
-float** CriarMatrizEspelhoOrigem();
-
+void matriz3_multiplicar_ponto(const float vetor[3], Matriz3 matriz, float resultado[3]);
+Matriz3 matriz3_multiplicar(Matriz3 matriz1, Matriz3 matriz2);
+Matriz3 matriz3_translacao(float tx, float ty);
+Matriz3 matriz3_escala(float sx, float sy);
+Matriz3 matriz3_rotacao(float angulo);
+Matriz3 matriz3_cisalhamento_x(float fator_x);
+Matriz3 matriz3_cisalhamento_y(float fator_y);
+Matriz3 matriz3_espelho_x(void);
+Matriz3 matriz3_espelho_y(void);
+Matriz3 matriz3_espelho_origem(void);
 
 #endif

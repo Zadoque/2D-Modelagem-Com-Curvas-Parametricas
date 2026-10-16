@@ -6,14 +6,13 @@
 #include "ultis/ultis.h"
 /**
  * Curva de Bézier
- * - Usa pontos de controle que "atraem" a curva
- * - Sempre passa pelos pontos inicial e final
- * - Pontos intermediários controlam a forma
- * - Ideal para design gráfico
+ * Segmento cúbico que interpola o primeiro e o último controle; os dois
+ * controles internos determinam a forma e as tangentes de extremidade.
  */
-void gerar_curva_bezier(ponto P0, ponto P1, ponto P2, ponto P3, Pontos *curva, AABB *box);
+void gerar_curva_bezier(ponto P0, ponto P1, ponto P2, ponto P3, Pontos *curva, AABB *box,
+                        ponto *ponto_final);
 ponto calcular_ponto_bezier(ponto P0, ponto P1, ponto P2, ponto P3, float t);
-void arrastar_ponto_bezier(Pontos *clicks, int seg, float ti, ponto mouse);
-ResultadoPicking picking_bezier(AABBTREE *arvore, Pontos *clicks, ponto mouse, float tolerancia, float melhor_dist);
-static void subdivide_bezier(ponto P0, ponto P1, ponto P2, ponto P3, Pontos *curva, ponto A, ponto B, float t0, float t1, float tol, AABB *box);
+void arrastar_ponto_bezier(Pontos *clicks, int seg, float ti, ponto mouse, float rigidez);
+ResultadoPicking picking_bezier(AABBTREE *arvore, Pontos *clicks, ponto mouse, float tolerancia,
+                                float melhor_dist);
 #endif
