@@ -1,5 +1,5 @@
-#include "../../includes/curvas/bezier.h"
-#include "../../includes/curvas/curva_generica.h"
+#include "curvas/bezier.h"
+#include "curvas/curva_generica.h"
 #include <math.h>
 
 #define FATOR_RIGIDEZ 8.0f

@@ -1,5 +1,5 @@
-#include "../../includes/curvas/bspline.h"
-#include "../../includes/curvas/curva_generica.h"
+#include "curvas/bspline.h"
+#include "curvas/curva_generica.h"
 #include <math.h>
 
 #define BSPLINE_FATOR_RIGIDEZ 8.0f

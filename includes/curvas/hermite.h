@@ -3,7 +3,7 @@
 
 #include "../pontos.h"
 #include "../aabb.h"
-#include "ultis/ultis.h"
+#include "utils.h"
 /**
  * Curva de Hermite
  * Interpola os dois pontos centrais. As tangentes são calculadas a partir

@@ -2,7 +2,7 @@
 #define BSPLINE_H
 #include "../pontos.h"
 #include "../aabb.h"
-#include "ultis/ultis.h"
+#include "utils.h"
 // ─── Avaliação da curva ───────────────────────────────────────────────────────
 
 ponto calcular_ponto_bspline(ponto P0, ponto P1, ponto P2, ponto P3, float t);

@@ -1,4 +1,4 @@
-#include "./../includes/vetor.h"
+#include "vetor.h"
 #include <stdlib.h>
 /* Capacidade mínima para evitar realocações excessivas */
 #define VEC_MIN_CAP 4

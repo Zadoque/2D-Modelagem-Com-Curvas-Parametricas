@@ -1,4 +1,4 @@
-#include "../includes/matriz.h"
+#include "matriz.h"
 #include <math.h>
 
 static Matriz3 identidade(void){

@@ -1,13 +1,14 @@
 #define _POSIX_C_SOURCE 200809L
-#include "../includes/geometria_curvas.h"
-#include "../includes/curvas/curva_generica.h"
-#include "../includes/curvas/bezier.h"
-#include "../includes/curvas/bspline.h"
-#include "../includes/curvas/catmullrom.h"
-#include "../includes/curvas/hermite.h"
+#include "geometria_curvas.h"
+#include "curvas/curva_generica.h"
+#include "curvas/bezier.h"
+#include "curvas/bspline.h"
+#include "curvas/catmullrom.h"
+#include "curvas/hermite.h"
 #include <stdlib.h>
 #include <time.h>
 #include <float.h>
+#include <math.h>
 
 typedef void (*Gerador)(ponto, ponto, ponto, ponto, Pontos *, AABB *, ponto *);
 
@@ -38,17 +39,28 @@ static int reservar_faixa(GeometriaCurvas *g){
   g->capacidade_faixas = capacidade;
   return 0;
 }
+
 static int adicionar(GeometriaCurvas *g, Pontos *scratch, AABB_vec *boxes, const Pontos *c,
-                     int inicio, Gerador gerar, ponto *ponto_final){
+                     int inicio, Gerador gerar, ponto *ponto_final_saida){
   int n = c->quantidade_atual;
   AABB box = {0};
   box.segmento_indice = inicio;
+  ponto ponto_final = {{0.0f, 0.0f, 1.0f}};
   gerar(c->data[inicio % n], c->data[(inicio + 1) % n], c->data[(inicio + 2) % n],
-        c->data[(inicio + 3) % n], scratch, &box, ponto_final);
+        c->data[(inicio + 3) % n], scratch, &box, &ponto_final);
+  if(isfinite(ponto_final.point[0]) && isfinite(ponto_final.point[1])){
+    box.x_min = fminf(box.x_min, ponto_final.point[0]);
+    box.y_min = fminf(box.y_min, ponto_final.point[1]);
+    box.x_max = fmaxf(box.x_max, ponto_final.point[0]);
+    box.y_max = fmaxf(box.y_max, ponto_final.point[1]);
+  }
+  if(ponto_final_saida){ *ponto_final_saida = ponto_final; }
   if(reservar_faixa(g) || aabb_vec_push(boxes, box)){
     return -1;
   }
-  FaixaCurva faixa = {g->vertices.quantidade_atual, scratch->quantidade_atual};
+  FaixaCurva faixa = {.inicio = g->vertices.quantidade_atual,
+                      .quantidade = scratch->quantidade_atual};
+  faixa.extremo_final = ponto_final;
   for(int i = 0; i < scratch->quantidade_atual; i++){
     if(pontos_push(&g->vertices, scratch->data[i])){
       return -1;
@@ -84,7 +96,7 @@ int geometria_curvas_atualizar(GeometriaCurvas *g, Pontos *scratch, AABB_vec *bo
     return 0;
   }
   Gerador gerar;
-  ponto ponto_final = {{0}};
+  ponto ponto_final = {{0.0f, 0.0f, 1.0f}};
   int possui_segmento = 0;
   int fechamento_bezier_incompleto;
   int passo = 1;
@@ -109,23 +121,21 @@ int geometria_curvas_atualizar(GeometriaCurvas *g, Pontos *scratch, AABB_vec *bo
     }
     possui_segmento = 1;
   }
-  if(!fechado){
-    goto concluir;
-  }
-  if(tipo == MODO_CURVA_BEZIER){
-    if(n % 3 == 0 && adicionar(g, scratch, boxes, c, n - 3, gerar, &ponto_final)){
-      return -1;
-    }
-    possui_segmento = n % 3 == 0 || possui_segmento;
-  } else {
-    for(int i = n - 3; i < n; i++){
-      if(adicionar(g, scratch, boxes, c, i, gerar, &ponto_final)){
+  if(fechado){
+    if(tipo == MODO_CURVA_BEZIER){
+      if(n % 3 == 0 && adicionar(g, scratch, boxes, c, n - 3, gerar, &ponto_final)){
         return -1;
       }
-      possui_segmento = 1;
+      possui_segmento = n % 3 == 0 || possui_segmento;
+    } else {
+      for(int i = n - 3; i < n; i++){
+        if(adicionar(g, scratch, boxes, c, i, gerar, &ponto_final)){
+          return -1;
+        }
+        possui_segmento = 1;
+      }
     }
   }
-concluir:
   fechamento_bezier_incompleto = fechado && tipo == MODO_CURVA_BEZIER && n % 3 != 0;
   if(possui_segmento && (!fechado || fechamento_bezier_incompleto)){
     if(pontos_push(&g->vertices, ponto_final)){
@@ -177,7 +187,7 @@ int geometria_curvas_atualizar_bspline_topologica(GeometriaCurvas *g, AABB_vec *
     if(reservar_faixa(g) || aabb_vec_push(boxes, box)){
       return -1;
     }
-    FaixaCurva faixa = {g->vertices.quantidade_atual, 0};
+    FaixaCurva faixa = {.inicio = g->vertices.quantidade_atual, .quantidade = 0};
     ponto ponto_inicio = bspline_topologia_avaliar(spline, inicio);
     ponto ponto_fim = bspline_topologia_avaliar(spline, fim);
     if(ordinal == 0 && pontos_push(&g->vertices, ponto_inicio) != 0){
@@ -187,6 +197,7 @@ int geometria_curvas_atualizar_bspline_topologica(GeometriaCurvas *g, AABB_vec *
       return -1;
     }
     faixa.quantidade = g->vertices.quantidade_atual - faixa.inicio;
+    faixa.extremo_final = ponto_fim;
     g->faixas[g->quantidade_faixas++] = faixa;
   }
   return 0;

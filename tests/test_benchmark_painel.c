@@ -9,6 +9,7 @@ int main(void){
   assert(configuracao.repeticoes == 100);
   assert(configuracao.warmup == 10);
   assert(configuracao.raio_arrasto == 30.0f);
+  assert(configuracao.quantidade_controles == 8);
 
   uint32_t primeiro = configuracao.semente;
   uint32_t segundo = configuracao.semente;

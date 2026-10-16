@@ -3,7 +3,7 @@
 
 #include "../aabb.h"
 #include "../pontos.h"
-#include "ultis/ultis.h"
+#include "utils.h"
 #include <stddef.h>
 
 typedef void (*CurvaCubicaPesos)(float t, float pesos[4]);

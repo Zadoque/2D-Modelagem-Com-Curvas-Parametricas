@@ -5,9 +5,9 @@
  * as feature test macros no primeiro include. */
 #define _POSIX_C_SOURCE 199309L
 
-#include "./../includes/performance.h"
-#include "./../includes/bspline_topologia.h"
-#include "./../includes/geometria_curvas.h"
+#include "performance.h"
+#include "bspline_topologia.h"
+#include "geometria_curvas.h"
 #include <stdio.h>
 #include <time.h>
 

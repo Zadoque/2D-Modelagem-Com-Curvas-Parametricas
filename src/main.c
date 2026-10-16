@@ -1,4 +1,4 @@
-#include "./../includes/opengl.h"
+#include "opengl.h"
 #include <GL/glut.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,7 +23,7 @@ int main(int argc, char **argv){
 
   // Inicializar GLUT
   glutInit(&argc, argv);
-  glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
   glutInitWindowSize(800, 800);
   glutCreateWindow("Trabalho 1 de computação Gráfica");
 
