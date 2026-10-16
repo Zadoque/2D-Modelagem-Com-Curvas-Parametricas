@@ -1,12 +1,20 @@
-#include "../includes/bspline_topologia.h"
-#include "../includes/curvas/ultis/ultis.h"
+#define _POSIX_C_SOURCE 199309L
+#include "bspline_topologia.h"
+#include "curvas/utils.h"
 
 #include <math.h>
 #include <float.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-#define BSPLINE_FATOR_RIGIDEZ 8.0f
+#define BSPLINE_FATOR_RIGIDEZ 24.0f
+
+static double agora_ms_topologia(void){
+  struct timespec instante;
+  clock_gettime(CLOCK_MONOTONIC, &instante);
+  return (double)instante.tv_sec * 1000.0 + (double)instante.tv_nsec / 1e6;
+}
 
 typedef struct {
   ponto *controles;
@@ -542,6 +550,42 @@ int bspline_topologia_arrastar(BSplineTopologia *spline, float u, ponto mouse, f
   return 0;
 }
 
+int bspline_topologia_arrastar_com_estatisticas(BSplineTopologia *spline, float u, ponto mouse,
+                                                 float rigidez, int span_central, float limiar,
+                                                 int remover, EstatisticasArrastoBSpline *estatisticas){
+  if(!spline || !estatisticas || span_central < 0 || !isfinite(limiar) || limiar < 0.0f){
+    return -1;
+  }
+  *estatisticas = (EstatisticasArrastoBSpline){0};
+  if(bspline_topologia_arrastar(spline, u, mouse, rigidez) != 0){
+    return -1;
+  }
+
+  float nos[7];
+  int quantidade = remover ?
+      bspline_topologia_candidatos_remocao(spline, span_central, limiar, nos, 7) :
+      bspline_topologia_candidatos_insercao(spline, span_central, limiar, nos, 7);
+  if(quantidade <= 0){
+    return quantidade;
+  }
+
+  double inicio = agora_ms_topologia();
+  int alterados = remover ? remover_nos_lyche_morken(spline, nos, quantidade, 1e-3f) :
+                           (inserir_nos_oslo(spline, nos, quantidade) == 0 ? quantidade : -1);
+  double duracao = agora_ms_topologia() - inicio;
+  if(alterados < 0){
+    return -1;
+  }
+  if(remover){
+    estatisticas->remocoes = alterados;
+    estatisticas->tempo_remocao_ms = duracao;
+  } else {
+    estatisticas->insercoes = alterados;
+    estatisticas->tempo_insercao_ms = duracao;
+  }
+  return alterados;
+}
+
 ResultadoPicking bspline_topologia_picking(const BSplineTopologia *spline, ponto mouse,
                                            float tolerancia){
   ResultadoPicking melhor = {-1, 0.0f, FLT_MAX};
@@ -640,108 +684,6 @@ ResultadoPicking bspline_topologia_picking_arvore(const BSplineTopologia *spline
     return sem;
   }
   return percorrer_arvore(spline, arvore, mouse, tolerancia, sem);
-}
-
-static int adicionar_candidato(float *nos, int quantidade, int capacidade, float candidato){
-  for(int i = 0; i < quantidade; i++){
-    if(fabsf(nos[i] - candidato) <= 1e-6f){
-      return quantidade;
-    }
-  }
-  if(quantidade >= capacidade){
-    return -1;
-  }
-  nos[quantidade] = candidato;
-  return quantidade + 1;
-}
-
-static int limites_locais(const BSplineTopologia *spline, int central, int *primeiro, int *ultimo){
-  float inicio, fim;
-  int quantidade = 0;
-  while(bspline_topologia_obter_span(spline, quantidade, &inicio, &fim, NULL) == 0){
-    quantidade++;
-  }
-  if(central < 0 || central >= quantidade){
-    return -1;
-  }
-  *primeiro = central - 3;
-  *ultimo = central + 3;
-  if(!spline->fechado){
-    if(*primeiro < 0){ *primeiro = 0; }
-    if(*ultimo >= quantidade){ *ultimo = quantidade - 1; }
-  }
-  return quantidade;
-}
-
-int bspline_topologia_candidatos_insercao(const BSplineTopologia *spline, int span_central,
-                                          float limiar, float *nos, int capacidade){
-  if(!spline || !nos || capacidade < 1 || !isfinite(limiar) || limiar < 0.0f){
-    return -1;
-  }
-  int primeiro, ultimo;
-  int quantidade_spans = limites_locais(spline, span_central, &primeiro, &ultimo);
-  if(quantidade_spans < 0){
-    return -1;
-  }
-  int quantidade = 0;
-  for(int bruto = primeiro; bruto <= ultimo; bruto++){
-    int ordinal = spline->fechado ? (bruto + quantidade_spans) % quantidade_spans : bruto;
-    float inicio, fim;
-    int indice_no;
-    bspline_topologia_obter_span(spline, ordinal, &inicio, &fim, &indice_no);
-    for(int i = indice_no - (int)spline->grau; i < indice_no; i++){
-      int esquerda = modulo_indice(i, spline->controles.quantidade_atual);
-      int direita = modulo_indice(i + 1, spline->controles.quantidade_atual);
-      if(calcula_distancia(spline->controles.data[esquerda], spline->controles.data[direita]) > limiar){
-        quantidade = adicionar_candidato(nos, quantidade, capacidade, (inicio + fim) * 0.5f);
-        if(quantidade < 0){
-          return -1;
-        }
-        break;
-      }
-    }
-  }
-  return quantidade;
-}
-
-int bspline_topologia_candidatos_remocao(const BSplineTopologia *spline, int span_central,
-                                         float limiar, float *nos, int capacidade){
-  if(!spline || !nos || capacidade < 1 || !isfinite(limiar) || limiar < 0.0f){
-    return -1;
-  }
-  int primeiro, ultimo;
-  int quantidade_spans = limites_locais(spline, span_central, &primeiro, &ultimo);
-  if(quantidade_spans < 0){
-    return -1;
-  }
-  int quantidade = 0;
-  for(int bruto = primeiro; bruto <= ultimo; bruto++){
-    int ordinal = spline->fechado ? (bruto + quantidade_spans) % quantidade_spans : bruto;
-    float inicio, fim;
-    if(bspline_topologia_obter_span(spline, ordinal, &inicio, &fim, NULL) != 0){
-      continue;
-    }
-    int indice_no;
-    bspline_topologia_obter_span(spline, ordinal, &inicio, &fim, &indice_no);
-    float maior_distancia = 0.0f;
-    for(int i = indice_no - (int)spline->grau; i < indice_no; i++){
-      int esquerda = modulo_indice(i, spline->controles.quantidade_atual);
-      int direita = modulo_indice(i + 1, spline->controles.quantidade_atual);
-      float distancia = calcula_distancia(spline->controles.data[esquerda], spline->controles.data[direita]);
-      if(distancia > maior_distancia){
-        maior_distancia = distancia;
-      }
-    }
-    /* Limiar alto torna a remoção permissiva; limiar baixo a impede. */
-    if((spline->fechado || inicio > spline->nos[spline->grau]) && maior_distancia < limiar){
-      quantidade = adicionar_candidato(nos, quantidade, capacidade, inicio);
-      if(quantidade < 0){
-        return -1;
-      }
-    }
-    (void)fim;
-  }
-  return quantidade;
 }
 
 int bspline_topologia_remapear_parametro(const BSplineTopologia *spline, float u, int *span,
@@ -992,6 +934,11 @@ int remover_nos_lyche_morken(BSplineTopologia *spline, const float *nos, int qua
   if(!spline || !nos || quantidade <= 0 || spline->grau != 3 || tolerancia < 0.0f ||
      !isfinite(tolerancia)){
     return -1;
+  }
+  for(int i = 0; i < quantidade; i++){
+    if(!isfinite(nos[i])){
+      return -1;
+    }
   }
   if(spline->fechado){
     return reconstruir_periodica(spline, nos, quantidade, 0, tolerancia);

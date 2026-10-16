@@ -1,4 +1,4 @@
-#include "../../includes/curvas/curva_generica.h"
+#include "curvas/curva_generica.h"
 #include <float.h>
 #include <math.h>
 
@@ -119,6 +119,16 @@ void gerar_segmento_curva_cubica(const CurvaCubicaOps *ops, ponto P0, ponto P1, 
   box->y_min = fminf(esquerda.y_min, direita.y_min);
   box->x_max = fmaxf(esquerda.x_max, direita.x_max);
   box->y_max = fmaxf(esquerda.y_max, direita.y_max);
+
+  box->x_min = fminf(box->x_min, A.point[0]);
+  box->y_min = fminf(box->y_min, A.point[1]);
+  box->x_max = fmaxf(box->x_max, B.point[0]);
+  box->y_max = fmaxf(box->y_max, B.point[1]);
+
+  box->x_min = fminf(box->x_min, M.point[0]);
+  box->y_min = fminf(box->y_min, M.point[1]);
+  box->x_max = fmaxf(box->x_max, M.point[0]);
+  box->y_max = fmaxf(box->y_max, M.point[1]);
 }
 
 static ResultadoPicking refinar(const CurvaCubicaOps *ops, ponto P0, ponto P1, ponto P2, ponto P3,

@@ -1,8 +1,9 @@
 #define _POSIX_C_SOURCE 199309L
 #define GL_GLEXT_PROTOTYPES
-#include "./../includes/opengl.h"
-#include "./../includes/obb.h"
-#include "./../includes/benchmark_painel.h"
+#include "opengl.h"
+#include "obb.h"
+#include "benchmark_painel.h"
+#include "renderizacao_buffers.h"
 #include <GL/freeglut_std.h>
 #include <GL/gl.h>
 #include <GL/glext.h>
@@ -39,20 +40,18 @@ static ponto centro_shear_inicial;
 static int shear_arrastando;
 static int eixo_shear;
 static int modo_anti_autointerferencia;
+static int mostrar_pontos_controle = 1;
+static int mostrar_arestas_controle = 1;
+static int mostrar_aabbs = 0;
+static int mostrar_arvore_aabb = 0;
+static int mostrar_obbs = 0;
+static int mostrar_arvore_obb = 0;
 static int painel_benchmark_aberto;
 static int benchmark_em_execucao;
 static ConfiguracaoBenchmark configuracao_benchmark;
 static ResultadoBenchmarkPainel resultados_benchmark[BENCH_CURVAS][BENCH_TESTES];
 static uint32_t aleatorio_benchmark;
 static int benchmark_curva_atual, benchmark_teste_atual, benchmark_amostra_atual;
-typedef struct {
-  GLuint curva;
-  GLuint controles;
-  size_t capacidade_curva;
-  size_t capacidade_controles;
-  uint64_t assinatura_controles;
-  int disponivel;
-} BuffersRenderizacao;
 static BuffersRenderizacao buffers_renderizacao;
 #define TOLERANCIA_FORMA_DENSIDADE 1e-3f
 #define TOLERANCIA_AUTOINTERFERENCIA 0.05f
@@ -61,6 +60,111 @@ static float cor_fundo[3] = {0.2f, 0.3f, 0.4f};
 
 static double agora_benchmark_ms(void);
 static void desenhar_quadro_benchmark_vbo(void);
+static void texto_bitmap(int x, int y, const char *texto);
+static void retangulo_benchmark(int x, int y, int largura, int altura, float r, float g, float b);
+
+#define VISUAL_X 15
+#define VISUAL_Y 60
+#define VISUAL_LARGURA 238
+#define VISUAL_LINHA 24
+#define VISUAL_ALTURA 174
+
+static const char *estado_visualizacao(int ativo){
+  return ativo ? "ON" : "OFF";
+}
+
+static int processar_clique_visualizacao(int x, int y){
+  int largura_janela = glutGet(GLUT_WINDOW_WIDTH);
+  int altura_janela = glutGet(GLUT_WINDOW_HEIGHT);
+  int largura_desenho = largura_janela - menu_largura;
+  if(x < VISUAL_X || x > VISUAL_X + VISUAL_LARGURA ||
+     y < VISUAL_Y || y > VISUAL_Y + VISUAL_ALTURA || x >= largura_desenho){
+    return 0;
+  }
+  int indice = (y - VISUAL_Y - 25) / VISUAL_LINHA;
+  if(y < VISUAL_Y + 25 || indice < 0 || indice >= 6){ return 1; }
+  switch(indice){
+  case 0: mostrar_pontos_controle = !mostrar_pontos_controle; break;
+  case 1: mostrar_arestas_controle = !mostrar_arestas_controle; break;
+  case 2: mostrar_aabbs = !mostrar_aabbs; break;
+  case 3: mostrar_arvore_aabb = !mostrar_arvore_aabb; break;
+  case 4: mostrar_obbs = !mostrar_obbs; break;
+  case 5: mostrar_arvore_obb = !mostrar_arvore_obb; break;
+  }
+  (void)altura_janela;
+  glutPostRedisplay();
+  return 1;
+}
+
+static void desenhar_painel_visualizacao(int largura_desenho, int altura_janela){
+  const char *nomes[6] = {"Pontos de controle", "Arestas de controle", "Caixas AABB",
+                          "Arvore AABB", "Caixas OBB", "Arvore OBB"};
+  const int estados[6] = {mostrar_pontos_controle, mostrar_arestas_controle, mostrar_aabbs,
+                          mostrar_arvore_aabb, mostrar_obbs, mostrar_arvore_obb};
+  int x = -largura_desenho / 2 + VISUAL_X;
+  int y = altura_janela / 2 - VISUAL_Y - VISUAL_ALTURA;
+  glColor3f(0.08f, 0.10f, 0.14f);
+  glBegin(GL_QUADS);
+  glVertex2i(x, y); glVertex2i(x + VISUAL_LARGURA, y);
+  glVertex2i(x + VISUAL_LARGURA, y + VISUAL_ALTURA); glVertex2i(x, y + VISUAL_ALTURA);
+  glEnd();
+  glColor3f(0.65f, 0.75f, 0.85f);
+  glBegin(GL_LINE_LOOP);
+  glVertex2i(x, y); glVertex2i(x + VISUAL_LARGURA, y);
+  glVertex2i(x + VISUAL_LARGURA, y + VISUAL_ALTURA); glVertex2i(x, y + VISUAL_ALTURA);
+  glEnd();
+  glColor3f(1.0f, 1.0f, 1.0f);
+  texto_bitmap(x + 10, y + VISUAL_ALTURA - 17, "Visualizacao");
+  for(int i = 0; i < 6; i++){
+    int linha_y = y + VISUAL_ALTURA - 43 - i * VISUAL_LINHA;
+    glColor3f(estados[i] ? 0.18f : 0.28f, estados[i] ? 0.55f : 0.30f,
+              estados[i] ? 0.25f : 0.32f);
+    glBegin(GL_QUADS);
+    glVertex2i(x + 10, linha_y - 4); glVertex2i(x + 43, linha_y - 4);
+    glVertex2i(x + 43, linha_y + 14); glVertex2i(x + 10, linha_y + 14);
+    glEnd();
+    glColor3f(1.0f, 1.0f, 1.0f);
+    texto_bitmap(x + 16, linha_y + 1, estado_visualizacao(estados[i]));
+    texto_bitmap(x + 52, linha_y + 1, nomes[i]);
+  }
+}
+
+static uint32_t semente_benchmark_clock(void){
+  struct timespec instante;
+  if(clock_gettime(CLOCK_MONOTONIC, &instante) != 0){
+    return UINT32_C(0x6d2b79f5);
+  }
+  uint64_t mistura = (uint64_t)instante.tv_sec * UINT64_C(1000000007) +
+                     (uint64_t)instante.tv_nsec;
+  mistura ^= mistura >> 32;
+  uint32_t semente = (uint32_t)mistura ^ (uint32_t)(mistura >> 16);
+  return semente ? semente : UINT32_C(0x6d2b79f5);
+}
+
+static uint32_t semente_benchmark_teste(uint32_t base, int curva, int teste){
+  uint32_t x = base ^ UINT32_C(0x9e3779b9) * (uint32_t)(1 + curva * BENCH_TESTES + teste);
+  x ^= x >> 16;
+  x *= UINT32_C(0x85ebca6b);
+  x ^= x >> 13;
+  x *= UINT32_C(0xc2b2ae35);
+  x ^= x >> 16;
+  return x ? x : UINT32_C(0x6d2b79f5);
+}
+
+static int benchmark_atalho_contem(int x, int y, int largura_desenho, int altura){
+  return x >= 12 && x <= 142 && y >= 12 && y <= 48 && x < largura_desenho &&
+         y < altura;
+}
+
+static void desenhar_atalho_benchmark(int largura_desenho, int altura){
+  float x = -0.5f * (float)largura_desenho + 12.0f;
+  float y = 0.5f * (float)altura - 48.0f;
+  retangulo_benchmark((int)(x + 0.5f * largura_desenho), (int)(y + 0.5f * altura),
+                      130, 36, 0.12f, 0.28f, 0.45f);
+  glColor3f(1.0f, 1.0f, 1.0f);
+  texto_bitmap((int)(x + 9.0f + 0.5f * largura_desenho),
+               (int)(y + 12.0f + 0.5f * altura), "Benchmark");
+}
 
 static void texto_bitmap(int x, int y, const char *texto){
   glRasterPos2i(x, y);
@@ -74,10 +178,18 @@ static void retangulo_benchmark(int x, int y, int largura, int altura, float r, 
   glEnd();
 }
 
+static void botao_ajuste_benchmark(int x, int y, char simbolo){
+  retangulo_benchmark(x, y, 24, 22, 0.16f, 0.35f, 0.52f);
+  glColor3f(1.0f, 1.0f, 1.0f);
+  char texto[2] = {simbolo, '\0'};
+  texto_bitmap(x + 8, y + 6, texto);
+}
+
 static void iniciar_benchmark_painel(void){
   for(int curva = 0; curva < BENCH_CURVAS; curva++){
     for(int teste = 0; teste < BENCH_TESTES; teste++){ benchmark_resultado_limpar(&resultados_benchmark[curva][teste]); }
   }
+  configuracao_benchmark.semente = semente_benchmark_clock();
   aleatorio_benchmark = configuracao_benchmark.semente;
   benchmark_curva_atual = benchmark_teste_atual = benchmark_amostra_atual = 0;
   benchmark_em_execucao = 1;
@@ -90,6 +202,11 @@ static void passo_benchmark_painel(void){
     if(benchmark_curva_atual == BENCH_CURVAS){ benchmark_em_execucao = 0; break; }
     while(benchmark_teste_atual < BENCH_TESTES && !(configuracao_benchmark.mascara_testes & (1u << benchmark_teste_atual))){ benchmark_teste_atual++; benchmark_amostra_atual = 0; }
     if(benchmark_teste_atual == BENCH_TESTES){ benchmark_curva_atual++; benchmark_teste_atual = 0; continue; }
+    if(benchmark_amostra_atual == 0){
+      aleatorio_benchmark = semente_benchmark_teste(configuracao_benchmark.semente,
+                                                     benchmark_curva_atual,
+                                                     benchmark_teste_atual);
+    }
     TipoBenchmark tipo = (TipoBenchmark)(1u << benchmark_teste_atual);
     ResultadoBenchmarkPainel *resultado = &resultados_benchmark[benchmark_curva_atual][benchmark_teste_atual];
     if(tipo == BENCH_DESENHO){
@@ -120,74 +237,104 @@ static void passo_benchmark_painel(void){
 static void desenhar_painel_benchmark(int largura, int altura){
   if(!painel_benchmark_aberto){ return; }
   glViewport(0, 0, largura, altura); glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, largura, 0, altura); glMatrixMode(GL_MODELVIEW); glLoadIdentity();
-  int x = largura / 2 - 300, y = altura / 2 - 250;
-  retangulo_benchmark(x, y, 600, 500, 0.08f, 0.09f, 0.12f);
-  glColor3f(1, 1, 1); texto_bitmap(x + 15, y + 475, "Benchmark — configuracao e resultados (ms por operacao)");
+  int x = largura / 2 - 510, y = altura / 2 - 320;
+  retangulo_benchmark(x, y, 1020, 640, 0.06f, 0.07f, 0.10f);
+  glColor3f(1, 1, 1); texto_bitmap(x + 25, y + 610, "Benchmark de desempenho");
+  glColor3f(0.55f, 0.65f, 0.75f); texto_bitmap(x + 25, y + 588, "Configuracao e resultados progressivos (ms por operacao)");
   char linha[128];
-  snprintf(linha, sizeof(linha), "Repeticoes: %d  Warm-up: %d  Rigidez: %.2f  Densidade: %d  Raio: %.1f", configuracao_benchmark.repeticoes, configuracao_benchmark.warmup, configuracao_benchmark.rigidez, configuracao_benchmark.posicao_densidade + 1, configuracao_benchmark.raio_arrasto);
-  texto_bitmap(x + 15, y + 448, linha);
-  texto_bitmap(x + 15, y + 428, "Curvas: H  C  B  Z     Testes: G geracao, D desenho, P picking, A arrasto, I anti");
+  snprintf(linha, sizeof(linha), "Repeticoes: %d   Warm-up: %d   R: %.2f   Distancia: %d   Raio: %.1f", configuracao_benchmark.repeticoes, configuracao_benchmark.warmup, configuracao_benchmark.rigidez, configuracao_benchmark.posicao_densidade, configuracao_benchmark.raio_arrasto);
+  texto_bitmap(x + 25, y + 555, linha);
+  snprintf(linha, sizeof(linha), "Pontos de controle: %d", configuracao_benchmark.quantidade_controles);
+  texto_bitmap(x + 25, y + 575, linha);
+  botao_ajuste_benchmark(x + 220, y + 565, '-');
+  botao_ajuste_benchmark(x + 250, y + 565, '+');
+  texto_bitmap(x + 25, y + 535, "Curvas:");
   static const char *nomes[] = {"Hermite", "Catmull", "B-spline", "Bezier"};
   for(int curva = 0; curva < BENCH_CURVAS; curva++){
-    snprintf(linha, sizeof(linha), "%s", nomes[curva]); texto_bitmap(x + 15, y + 390 - curva * 55, linha);
+    int cx = x + 115 + curva * 92;
+    int ativo = configuracao_benchmark.mascara_curvas & (1u << curva);
+    retangulo_benchmark(cx, y + 520, 82, 22, ativo ? 0.18f : 0.12f, ativo ? 0.48f : 0.16f, ativo ? 0.65f : 0.18f);
+    glColor3f(1, 1, 1); texto_bitmap(cx + 6, y + 527, nomes[curva]);
+  }
+  texto_bitmap(x + 25, y + 495, "Testes:");
+  static const char *testes[] = {"Geracao", "Desenho", "Picking", "Arrasto", "Auto"};
+  for(int teste = 0; teste < BENCH_TESTES; teste++){
+    int tx = x + 95 + teste * 105;
+    int ativo = configuracao_benchmark.mascara_testes & (1u << teste);
+    retangulo_benchmark(tx, y + 480, 95, 22, ativo ? 0.18f : 0.12f, ativo ? 0.48f : 0.16f, ativo ? 0.65f : 0.18f);
+    glColor3f(1, 1, 1); texto_bitmap(tx + 5, y + 487, testes[teste]);
+  }
+  texto_bitmap(x + 25, y + 445, "Parametros");
+  snprintf(linha, sizeof(linha), "Repeticoes: %d", configuracao_benchmark.repeticoes);
+  texto_bitmap(x + 25, y + 425, linha);
+  botao_ajuste_benchmark(x + 235, y + 415, '-');
+  botao_ajuste_benchmark(x + 265, y + 415, '+');
+  snprintf(linha, sizeof(linha), "Warm-up: %d", configuracao_benchmark.warmup);
+  texto_bitmap(x + 390, y + 425, linha);
+  botao_ajuste_benchmark(x + 575, y + 415, '-');
+  botao_ajuste_benchmark(x + 605, y + 415, '+');
+  snprintf(linha, sizeof(linha), "Rigidez R: %.2f", configuracao_benchmark.rigidez);
+  texto_bitmap(x + 25, y + 405, linha);
+  botao_ajuste_benchmark(x + 235, y + 395, '-');
+  botao_ajuste_benchmark(x + 265, y + 395, '+');
+  snprintf(linha, sizeof(linha), "Distancia: %d", configuracao_benchmark.posicao_densidade);
+  texto_bitmap(x + 390, y + 405, linha);
+  botao_ajuste_benchmark(x + 575, y + 395, '-');
+  botao_ajuste_benchmark(x + 605, y + 395, '+');
+  snprintf(linha, sizeof(linha), "Raio: %.1f", configuracao_benchmark.raio_arrasto);
+  texto_bitmap(x + 25, y + 385, linha);
+  botao_ajuste_benchmark(x + 235, y + 375, '-');
+  botao_ajuste_benchmark(x + 265, y + 375, '+');
+  texto_bitmap(x + 390, y + 385, "Protecao contra autointerferencia:");
+  retangulo_benchmark(x + 700, y + 375, 95, 22,
+                      configuracao_benchmark.anti_autointerferencia ? 0.20f : 0.30f,
+                      configuracao_benchmark.anti_autointerferencia ? 0.55f : 0.22f,
+                      0.28f);
+  glColor3f(1, 1, 1);
+  texto_bitmap(x + 715, y + 382, configuracao_benchmark.anti_autointerferencia ? "ON" : "OFF");
+  texto_bitmap(x + 25, y + 355, "Resultados por curva (barras normalizadas por teste)");
+  for(int teste = 0; teste < BENCH_TESTES; teste++){
+    snprintf(linha, sizeof(linha), "%s", testes[teste]);
+    glColor3f(0.75f, 0.8f, 0.9f); texto_bitmap(x + 105 + teste * 165, y + 335, linha);
+  }
+  for(int curva = 0; curva < BENCH_CURVAS; curva++){
+    int base_y = y + 300 - curva * 64;
+    glColor3f(1, 1, 1); texto_bitmap(x + 25, base_y + 7, nomes[curva]);
     for(int teste = 0; teste < BENCH_TESTES; teste++){
       double media = benchmark_resultado_media(&resultados_benchmark[curva][teste]);
-      int barra = (int)(media * 40.0); if(barra > 360){ barra = 360; }
-      retangulo_benchmark(x + 100 + teste * 75, y + 380 - curva * 55, barra / 5 + 1, 14, 0.2f, 0.7f, 0.35f);
-      snprintf(linha, sizeof(linha), "%.3f", media); glColor3f(1,1,1); texto_bitmap(x + 100 + teste * 75, y + 360 - curva * 55, linha);
+      int barra = (int)fmin(125.0, media * 35.0);
+      int bx = x + 105 + teste * 165;
+      if(teste == 4 && curva != MODO_CURVA_BSPLINE){
+        glColor3f(0.65f, 0.68f, 0.75f);
+        texto_bitmap(bx, base_y + 3, "N/A");
+        continue;
+      }
+      retangulo_benchmark(bx, base_y, barra, 16, 0.18f, 0.55f, 0.78f);
+      if(teste == 4){
+        snprintf(linha, sizeof(linha), "media %.3f ms N:%d", media,
+                 resultados_benchmark[curva][teste].amostras);
+      } else {
+        snprintf(linha, sizeof(linha), "%.3f ms", media);
+      }
+      glColor3f(1,1,1); texto_bitmap(bx, base_y - 14, linha);
+      if(teste == 3){
+        double amostras = resultados_benchmark[curva][teste].amostras > 0 ?
+                              (double)resultados_benchmark[curva][teste].amostras : 1.0;
+        snprintf(linha, sizeof(linha), "I:%.2f R:%.2f",
+                 resultados_benchmark[curva][teste].insercoes / amostras,
+                 resultados_benchmark[curva][teste].remocoes / amostras);
+        texto_bitmap(bx, base_y - 28, linha);
+        if(curva == MODO_CURVA_BSPLINE && resultados_benchmark[curva][teste].amostras > 0){
+          snprintf(linha, sizeof(linha), "D %.3f/%.3f", resultados_benchmark[curva][teste].soma_insercao_ms / resultados_benchmark[curva][teste].amostras, resultados_benchmark[curva][teste].soma_remocao_ms / resultados_benchmark[curva][teste].amostras);
+          texto_bitmap(bx, base_y - 42, linha);
+        }
+      }
     }
   }
-  texto_bitmap(x + 15, y + 105, "Clique: curvas [linha 1], testes [linha 2]; -/+ repeticoes; iniciar; fechar.");
-  retangulo_benchmark(x + 15, y + 25, 120, 35, 0.2f, 0.65f, 0.25f); retangulo_benchmark(x + 155, y + 25, 120, 35, 0.65f, 0.25f, 0.25f);
-  glColor3f(1,1,1); texto_bitmap(x + 43, y + 38, benchmark_em_execucao ? "Executando" : "Iniciar"); texto_bitmap(x + 195, y + 38, "Fechar");
-}
-
-static uint64_t assinatura_pontos(const Pontos *pontos){
-  uint64_t assinatura = UINT64_C(1469598103934665603);
-  for(int i = 0; i < pontos->quantidade_atual; i++){
-    for(int eixo = 0; eixo < 3; eixo++){
-      uint32_t bits;
-      memcpy(&bits, &pontos->data[i].point[eixo], sizeof(bits));
-      assinatura ^= bits;
-      assinatura *= UINT64_C(1099511628211);
-    }
-  }
-  return assinatura ^ (uint64_t)pontos->quantidade_atual;
-}
-
-static void atualizar_buffer_vertices(GLuint buffer, size_t *capacidade, const Pontos *pontos){
-  size_t bytes = (size_t)pontos->quantidade_atual * sizeof(*pontos->data);
-  if(bytes == 0){ return; }
-  glBindBuffer(GL_ARRAY_BUFFER, buffer);
-  if(bytes > *capacidade){
-    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)bytes, pontos->data, GL_DYNAMIC_DRAW);
-    *capacidade = bytes;
-  } else {
-    glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)bytes, pontos->data);
-  }
-}
-
-static void atualizar_buffers_renderizacao(void){
-  if(!buffers_renderizacao.disponivel){ return; }
-  atualizar_buffer_vertices(buffers_renderizacao.curva, &buffers_renderizacao.capacidade_curva,
-                            &geometria_curva.vertices);
-  uint64_t assinatura = assinatura_pontos(&g_clicks);
-  if(assinatura != buffers_renderizacao.assinatura_controles){
-    atualizar_buffer_vertices(buffers_renderizacao.controles,
-                              &buffers_renderizacao.capacidade_controles, &g_clicks);
-    buffers_renderizacao.assinatura_controles = assinatura;
-  }
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-static void desenhar_buffer_vertices(GLuint buffer, GLenum modo, int quantidade){
-  if(!buffers_renderizacao.disponivel || quantidade <= 0){ return; }
-  glBindBuffer(GL_ARRAY_BUFFER, buffer);
-  glEnableClientState(GL_VERTEX_ARRAY);
-  glVertexPointer(2, GL_FLOAT, (GLsizei)sizeof(ponto), (const void *)0);
-  glDrawArrays(modo, 0, quantidade);
-  glDisableClientState(GL_VERTEX_ARRAY);
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  texto_bitmap(x + 25, y + 55, benchmark_em_execucao ? "Executando... resultados atualizados a cada quadro" : "Pronto");
+  retangulo_benchmark(x + 780, y + 25, 100, 35, 0.2f, 0.65f, 0.25f);
+  retangulo_benchmark(x + 895, y + 25, 100, 35, 0.65f, 0.25f, 0.25f);
+  glColor3f(1,1,1); texto_bitmap(x + 810, y + 38, benchmark_em_execucao ? "Rodando" : "Iniciar"); texto_bitmap(x + 925, y + 38, "Fechar");
 }
 
 static double agora_benchmark_ms(void){
@@ -200,12 +347,13 @@ static void desenhar_quadro_benchmark_vbo(void){
   glClear(GL_COLOR_BUFFER_BIT);
   glColor3f(1.0f, 0.0f, 0.0f);
   glPointSize(8.0f);
-  desenhar_buffer_vertices(buffers_renderizacao.controles, GL_POINTS, g_clicks.quantidade_atual);
+  renderizacao_desenhar_buffer(&buffers_renderizacao, buffers_renderizacao.controles, GL_POINTS,
+                               g_clicks.quantidade_atual);
   glColor3f(0.0f, 1.0f, 0.0f);
   glLineWidth(1.0f);
-  desenhar_buffer_vertices(buffers_renderizacao.curva,
-                           geometria_curva.fechado ? GL_LINE_LOOP : GL_LINE_STRIP,
-                           geometria_curva.vertices.quantidade_atual);
+  renderizacao_desenhar_buffer(&buffers_renderizacao, buffers_renderizacao.curva,
+                               geometria_curva.fechado ? GL_LINE_LOOP : GL_LINE_STRIP,
+                               geometria_curva.vertices.quantidade_atual);
   glFinish();
 }
 
@@ -231,11 +379,7 @@ void initGL(){
   shear_arrastando = 0;
   eixo_shear = 0;
   benchmark_configuracao_padrao(&configuracao_benchmark);
-  glGenBuffers(1, &buffers_renderizacao.curva);
-  glGenBuffers(1, &buffers_renderizacao.controles);
-  buffers_renderizacao.disponivel =
-      buffers_renderizacao.curva != 0 && buffers_renderizacao.controles != 0;
-  buffers_renderizacao.assinatura_controles = UINT64_MAX;
+  renderizacao_buffers_inicializar(&buffers_renderizacao);
   centro.point[0] = 0;
   centro.point[1] = 0;
   centro.point[2] = 1;
@@ -243,8 +387,7 @@ void initGL(){
 }
 
 void finalizar_aplicacao(void){
-  if(buffers_renderizacao.curva){ glDeleteBuffers(1, &buffers_renderizacao.curva); }
-  if(buffers_renderizacao.controles){ glDeleteBuffers(1, &buffers_renderizacao.controles); }
+  renderizacao_buffers_liberar(&buffers_renderizacao);
   aabb_tree_free(arvore_boxes);
   free(vetor_boxes.dados);
   geometria_curvas_free(&geometria_curva);
@@ -454,23 +597,32 @@ int definir_modo_anti_autointerferencia(int ativo){
  * selecionada é preservada em u_global e só recebe um novo span/t local após
  * a transação de Oslo ou Lyche-Morken ter terminado. */
 static int mutar_topologia_bspline(const float *nos, int quantidade, int remover){
+  SnapshotArrastoBSpline snapshot;
+  if(snapshot_capturar(&snapshot) != 0){
+    return -1;
+  }
   ReferenciaArrastoBSpline referencia;
   int possui_referencia = selecao_bspline_topologica && selecao_curva.seg_curva >= 0;
   if(possui_referencia &&
      bspline_topologia_capturar_referencia_arrasto(&bspline_topologica,
                                                    selecao_curva.u_global, &referencia) != 0){
+    snapshot_liberar(&snapshot);
     return -1;
   }
   int resultado = remover ?
       remover_nos_lyche_morken(&bspline_topologica, nos, quantidade, TOLERANCIA_FORMA_DENSIDADE) :
       inserir_nos_oslo(&bspline_topologica, nos, quantidade);
   if(resultado < 0){
+    snapshot_restaurar(&snapshot);
+    snapshot_liberar(&snapshot);
     return -1;
   }
   int alterou = remover ? resultado > 0 : 1;
   if(alterou && possui_referencia){
     if(bspline_topologia_remapear_referencia_arrasto(&bspline_topologica, &referencia,
                                                      TOLERANCIA_FORMA_DENSIDADE) != 0){
+      snapshot_restaurar(&snapshot);
+      snapshot_liberar(&snapshot);
       return -1;
     }
     selecao_curva.u_global = referencia.u_global;
@@ -478,8 +630,11 @@ static int mutar_topologia_bspline(const float *nos, int quantidade, int remover
     selecao_curva.t_local = referencia.t_local;
   }
   if(alterou && reconstruir_arvore_obb_bspline() != 0){
+    snapshot_restaurar(&snapshot);
+    snapshot_liberar(&snapshot);
     return -1;
   }
+  snapshot_liberar(&snapshot);
   return resultado;
 }
 
@@ -490,12 +645,27 @@ static void normalizar_densidade_bspline(int preferir_remocao, int todos_os_span
     return;
   }
   int quantidade = 0;
+  if(todos_os_spans){
+    quantidade = preferir_remocao ? bspline_topologia_candidatos_remocao_todos(
+        &bspline_topologica, obter_limiar_densidade(), nos,
+        (int)(sizeof(nos) / sizeof(nos[0]))) :
+      bspline_topologia_candidatos_insercao_todos(
+        &bspline_topologica, obter_limiar_densidade(), nos,
+        (int)(sizeof(nos) / sizeof(nos[0])));
+    if(quantidade <= 0){
+      return;
+    }
+    if(mutar_topologia_bspline(nos, quantidade, preferir_remocao) >= 0){
+      sincronizar_controles_da_bspline();
+    }
+    return;
+  }
   int ultimo_span = 0;
   float inicio, fim;
   while(bspline_topologia_obter_span(&bspline_topologica, ultimo_span, &inicio, &fim, NULL) == 0){
     ultimo_span++;
   }
-  int primeiro = todos_os_spans ? 0 : ultimo_span - 1;
+  int primeiro = ultimo_span - 1;
   for(int central = primeiro; central < ultimo_span; central++){
     float locais[7];
     int locais_qtd = preferir_remocao ?
@@ -619,6 +789,53 @@ void desenhar_arvore_aabb(AABBTREE *raiz){
   desenhar_no_arvore(raiz, 0, prof_max);
   glLineWidth(1.0f);
 }
+
+static void vertices_obb_render(const OBB *caixa, ponto vertices[4]){
+  static const int sinais[4][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+  for(int i = 0; i < 4; i++){
+    vertices[i] = caixa->centro;
+    vertices[i].point[0] += sinais[i][0] * caixa->extents[0] * caixa->eixo[0].point[0];
+    vertices[i].point[1] += sinais[i][0] * caixa->extents[0] * caixa->eixo[0].point[1];
+    vertices[i].point[0] += sinais[i][1] * caixa->extents[1] * caixa->eixo[1].point[0];
+    vertices[i].point[1] += sinais[i][1] * caixa->extents[1] * caixa->eixo[1].point[1];
+  }
+}
+
+static void desenhar_obb_caixa(const OBB *caixa, float r, float g, float b){
+  if(!caixa){ return; }
+  ponto vertices[4];
+  vertices_obb_render(caixa, vertices);
+  glColor3f(r, g, b);
+  glBegin(GL_LINE_LOOP);
+  for(int i = 0; i < 4; i++){ glVertex2f(vertices[i].point[0], vertices[i].point[1]); }
+  glEnd();
+}
+
+static void desenhar_obbs_folhas(const OBBArvore *arvore){
+  if(!arvore || !arvore->nos){ return; }
+  for(int i = 0; i < arvore->quantidade_nos; i++){
+    const OBBNo *no = &arvore->nos[i];
+    if(no->esquerda < 0 && no->direita < 0){
+      float t = arvore->quantidade_folhas > 1 ?
+                    (float)no->segmento_indice / (float)(arvore->quantidade_folhas - 1) : 0.0f;
+      desenhar_obb_caixa(&no->caixa, 0.85f, 0.25f + 0.5f * t, 0.15f);
+    }
+  }
+}
+
+static void desenhar_no_arvore_obb(const OBBArvore *arvore, int indice, int profundidade){
+  if(!arvore || !arvore->nos || indice < 0 || indice >= arvore->quantidade_nos){ return; }
+  const OBBNo *no = &arvore->nos[indice];
+  float intensidade = fmaxf(0.2f, 1.0f - 0.12f * (float)profundidade);
+  desenhar_obb_caixa(&no->caixa, 0.25f, 0.65f * intensidade, 0.95f);
+  if(no->esquerda >= 0){ desenhar_no_arvore_obb(arvore, no->esquerda, profundidade + 1); }
+  if(no->direita >= 0){ desenhar_no_arvore_obb(arvore, no->direita, profundidade + 1); }
+}
+
+static void desenhar_arvore_obb(const OBBArvore *arvore){
+  if(arvore && arvore->raiz >= 0){ desenhar_no_arvore_obb(arvore, arvore->raiz, 0); }
+}
+
 void gerar_curva_selecionada(){
   if(!precisa_refazer_curva){
     return;
@@ -644,7 +861,11 @@ void gerar_curva_selecionada(){
   }
   contadores_interface_atualizar(&estado_atual, &g_clicks, &geometria_curva.vertices);
   performance_definir_buffers(&g_clicks, &geometria_curva.vertices);
-  atualizar_buffers_renderizacao();
+  renderizacao_buffers_atualizar(&buffers_renderizacao, &geometria_curva, &g_clicks);
+  /* A árvore AABB também pode ser exibida; portanto ela precisa acompanhar
+     a geometria, e não somente ser reconstruída no fim do picking. */
+  aabb_tree_free(arvore_boxes);
+  arvore_boxes = aabb_vec_para_arvore(&vetor_boxes);
   precisa_refazer_curva = 0;
 }
 void desenhar_aabbs(AABB_vec *v){
@@ -675,11 +896,43 @@ void desenhar_aabbs(AABB_vec *v){
     glEnd();
   }
 }
+
+static void desenhar_aabbs_renderizados(const GeometriaCurvas *geometria){
+  if(!geometria || !geometria->faixas){ return; }
+  for(int faixa = 0; faixa < geometria->quantidade_faixas; faixa++){
+    FaixaCurva intervalo = geometria->faixas[faixa];
+    if(intervalo.quantidade <= 0 || intervalo.inicio < 0 ||
+       intervalo.inicio + intervalo.quantidade > geometria->vertices.quantidade_atual){
+      continue;
+    }
+    float x_min = FLT_MAX, y_min = FLT_MAX;
+    float x_max = -FLT_MAX, y_max = -FLT_MAX;
+    for(int i = intervalo.inicio; i < intervalo.inicio + intervalo.quantidade; i++){
+      ponto p = geometria->vertices.data[i];
+      x_min = fminf(x_min, p.point[0]);
+      y_min = fminf(y_min, p.point[1]);
+      x_max = fmaxf(x_max, p.point[0]);
+      y_max = fmaxf(y_max, p.point[1]);
+    }
+    x_min = fminf(x_min, intervalo.extremo_final.point[0]);
+    y_min = fminf(y_min, intervalo.extremo_final.point[1]);
+    x_max = fmaxf(x_max, intervalo.extremo_final.point[0]);
+    y_max = fmaxf(y_max, intervalo.extremo_final.point[1]);
+    float t = geometria->quantidade_faixas > 1 ?
+                  (float)faixa / (float)(geometria->quantidade_faixas - 1) : 0.0f;
+    glColor3f(0.35f + 0.5f * t, 0.25f, 0.85f - 0.5f * t);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x_min, y_min); glVertex2f(x_max, y_min);
+    glVertex2f(x_max, y_max); glVertex2f(x_min, y_max);
+    glEnd();
+  }
+}
+
 void desenhar_curva_atual(){
   glLineWidth(0.1f);
-  desenhar_buffer_vertices(buffers_renderizacao.curva,
-                           geometria_curva.fechado ? GL_LINE_LOOP : GL_LINE_STRIP,
-                           geometria_curva.vertices.quantidade_atual);
+  renderizacao_desenhar_buffer(&buffers_renderizacao, buffers_renderizacao.curva,
+                               geometria_curva.fechado ? GL_LINE_LOOP : GL_LINE_STRIP,
+                               geometria_curva.vertices.quantidade_atual);
 }
 
 void AlteraTamanhoJanela(int w, int h){
@@ -722,33 +975,42 @@ void desenhar_centro_poligono(){
 
 void desenhar_conteudo_principal(){
   gerar_curva_selecionada();
-  // Desenhar pontos de controle
-  glColor3f(1.0f, 0.0f, 0.0f); // Vermelho
-  glPointSize(8.0f);
-  desenhar_buffer_vertices(buffers_renderizacao.controles, GL_POINTS, g_clicks.quantidade_atual);
-  glColor3f(0.0f, 1.0f, 0.0f); // Verde
-  glLineWidth(0.1f);
-
-  switch(estado_atual.poligono){
-  case MODO_POLIGONO_FECHADO:
-    if(g_clicks.quantidade_atual <= 2){
-      desenhar_buffer_vertices(buffers_renderizacao.controles, GL_LINE_STRIP,
-                               g_clicks.quantidade_atual);
-    } else {
-      desenhar_buffer_vertices(buffers_renderizacao.controles, GL_LINE_LOOP,
-                               g_clicks.quantidade_atual);
+  if(mostrar_pontos_controle){
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glPointSize(8.0f);
+    renderizacao_desenhar_buffer(&buffers_renderizacao, buffers_renderizacao.controles, GL_POINTS,
+                                 g_clicks.quantidade_atual);
+  }
+  if(mostrar_arestas_controle){
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glLineWidth(0.1f);
+    switch(estado_atual.poligono){
+    case MODO_POLIGONO_FECHADO:
+      if(g_clicks.quantidade_atual <= 2){
+        renderizacao_desenhar_buffer(&buffers_renderizacao, buffers_renderizacao.controles,
+                                     GL_LINE_STRIP, g_clicks.quantidade_atual);
+      } else {
+        renderizacao_desenhar_buffer(&buffers_renderizacao, buffers_renderizacao.controles,
+                                     GL_LINE_LOOP, g_clicks.quantidade_atual);
+      }
+      break;
+    case MODO_POLIGONO_ABERTO:
+      if(g_clicks.quantidade_atual >= 2){
+        renderizacao_desenhar_buffer(&buffers_renderizacao, buffers_renderizacao.controles,
+                                     GL_LINE_STRIP, g_clicks.quantidade_atual);
+      }
+      break;
     }
-    break;
-  case MODO_POLIGONO_ABERTO:
-    if(g_clicks.quantidade_atual >= 2){
-      desenhar_buffer_vertices(buffers_renderizacao.controles, GL_LINE_STRIP,
-                               g_clicks.quantidade_atual);
-    }
-    break;
   }
 
   desenhar_centro_poligono();
+  if(mostrar_aabbs){ desenhar_aabbs_renderizados(&geometria_curva); }
+  if(mostrar_arvore_aabb){ desenhar_arvore_aabb(arvore_boxes); }
+  if(mostrar_obbs){ desenhar_obbs_folhas(&arvore_obb); }
+  if(mostrar_arvore_obb){ desenhar_arvore_obb(&arvore_obb); }
   desenhar_curva_atual();
+  desenhar_painel_visualizacao((int)(glutGet(GLUT_WINDOW_WIDTH) - menu_largura),
+                               glutGet(GLUT_WINDOW_HEIGHT));
 }
 
 void display(){
@@ -776,6 +1038,8 @@ void display(){
   glVertex2f(0, (int)(altura_janela / 2));
   glEnd();
 
+  desenhar_atalho_benchmark(largura_desenho, altura_janela);
+
   // Desenhar conteúdo
   desenhar_conteudo_principal();
 
@@ -799,29 +1063,65 @@ void display(){
   desenhar_botoes_menu();
   desenhar_info();
   desenhar_painel_benchmark(largura_janela, altura_janela);
-  glFlush();
   passo_benchmark_painel();
+  glutSwapBuffers();
 }
 
 static int processar_clique_painel_benchmark(int x, int y){
   int largura = glutGet(GLUT_WINDOW_WIDTH), altura = glutGet(GLUT_WINDOW_HEIGHT);
-  int esquerda = largura / 2 - 300, baixo = altura / 2 - 250;
+  int esquerda = largura / 2 - 510, baixo = altura / 2 - 320;
   int local_x = x - esquerda, local_y = (altura - y) - baixo;
   if(local_y >= 25 && local_y <= 60){
-    if(local_x >= 15 && local_x <= 135){ if(!benchmark_em_execucao){ iniciar_benchmark_painel(); } return 1; }
-    if(local_x >= 155 && local_x <= 275){ painel_benchmark_aberto = 0; benchmark_em_execucao = 0; return 1; }
+    if(local_x >= 780 && local_x <= 880){ if(!benchmark_em_execucao){ iniciar_benchmark_painel(); } return 1; }
+    if(local_x >= 895 && local_x <= 995){ painel_benchmark_aberto = 0; benchmark_em_execucao = 0; return 1; }
   }
-  if(local_y >= 405 && local_y <= 435){
-    int indice = (local_x - 85) / 40;
+  if(local_y >= 520 && local_y <= 542){
+    int indice = (local_x - 115) / 92;
     if(indice >= 0 && indice < BENCH_CURVAS){ configuracao_benchmark.mascara_curvas ^= 1u << indice; return 1; }
   }
-  if(local_y >= 380 && local_y <= 405){
-    int indice = (local_x - 235) / 38;
+  if(local_y >= 565 && local_y <= 590 && local_x >= 215 && local_x <= 280){
+    if(local_x < 245){
+      configuracao_benchmark.quantidade_controles =
+          configuracao_benchmark.quantidade_controles > 4 ?
+          configuracao_benchmark.quantidade_controles - 1 : 4;
+    } else {
+      configuracao_benchmark.quantidade_controles =
+          configuracao_benchmark.quantidade_controles < 256 ?
+          configuracao_benchmark.quantidade_controles + 1 : 256;
+    }
+    return 1;
+  }
+  if(local_y >= 480 && local_y <= 502){
+    int indice = (local_x - 95) / 105;
     if(indice >= 0 && indice < BENCH_TESTES){ configuracao_benchmark.mascara_testes ^= 1u << indice; return 1; }
   }
-  if(local_y >= 440 && local_y <= 470){
-    if(local_x < 300){ configuracao_benchmark.repeticoes = configuracao_benchmark.repeticoes > 10 ? configuracao_benchmark.repeticoes - 10 : 1; }
-    else { configuracao_benchmark.repeticoes += 10; }
+  if(local_y >= 415 && local_y <= 440){
+    if(local_x >= 230 && local_x <= 290){
+      if(local_x < 260){ configuracao_benchmark.repeticoes = configuracao_benchmark.repeticoes > 10 ? configuracao_benchmark.repeticoes - 10 : 1; }
+      else { configuracao_benchmark.repeticoes += 10; }
+    } else if(local_x >= 565 && local_x <= 635){
+      if(local_x < 595){ configuracao_benchmark.warmup = configuracao_benchmark.warmup > 5 ? configuracao_benchmark.warmup - 5 : 0; }
+      else { configuracao_benchmark.warmup += 5; }
+    }
+    return 1;
+  }
+  if(local_y >= 395 && local_y <= 415){
+    if(local_x >= 230 && local_x <= 290){
+      if(local_x < 260){ configuracao_benchmark.rigidez = fmaxf(0.0f, configuracao_benchmark.rigidez - 0.05f); }
+      else { configuracao_benchmark.rigidez = fminf(1.0f, configuracao_benchmark.rigidez + 0.05f); }
+    } else if(local_x >= 565 && local_x <= 635){
+      if(local_x < 595){ configuracao_benchmark.posicao_densidade = configuracao_benchmark.posicao_densidade > 0 ? configuracao_benchmark.posicao_densidade - 1 : 0; }
+      else { configuracao_benchmark.posicao_densidade = configuracao_benchmark.posicao_densidade < 4 ? configuracao_benchmark.posicao_densidade + 1 : 4; }
+    }
+    return 1;
+  }
+  if(local_y >= 375 && local_y <= 395){
+    if(local_x >= 230 && local_x <= 290){
+      if(local_x < 260){ configuracao_benchmark.raio_arrasto = fmaxf(0.0f, configuracao_benchmark.raio_arrasto - 5.0f); }
+      else { configuracao_benchmark.raio_arrasto += 5.0f; }
+    } else if(local_x >= 690 && local_x <= 800){
+      configuracao_benchmark.anti_autointerferencia = !configuracao_benchmark.anti_autointerferencia;
+    }
     return 1;
   }
   return 1;
@@ -1148,6 +1448,15 @@ void onMouse(int button, int state, int x, int y){
       int largura_janela = glutGet(GLUT_WINDOW_WIDTH);
       int largura_desenho = largura_janela - menu_largura;
       if(x < largura_desenho){
+        if(benchmark_atalho_contem(x, y, largura_desenho, glutGet(GLUT_WINDOW_HEIGHT))){
+          painel_benchmark_aberto = 1;
+          benchmark_em_execucao = 0;
+          glutPostRedisplay();
+          return;
+        }
+        if(processar_clique_visualizacao(x, y)){
+          return;
+        }
         // Clique na área de desenho
         processar_clique_desenho(x, y);
       } else {

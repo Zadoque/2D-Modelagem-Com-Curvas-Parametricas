@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include "./../includes/aabb.h"
+#include "aabb.h"
 #include <math.h>
 #ifndef FLT_MAX
 #define FLT_MAX 999999999.0f

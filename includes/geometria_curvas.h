@@ -7,6 +7,9 @@
 
 typedef struct {
   int inicio, quantidade;
+  /* Endpoint t=1 da faixa: usado para fechar a AABB sem duplicar o vértice
+   * na polilinha renderizada. */
+  ponto extremo_final;
 } FaixaCurva;
 typedef struct {
   Pontos vertices;

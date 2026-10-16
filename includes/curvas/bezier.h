@@ -3,7 +3,7 @@
 
 #include "../pontos.h"
 #include "../aabb.h"
-#include "ultis/ultis.h"
+#include "utils.h"
 /**
  * Curva de Bézier
  * Segmento cúbico que interpola o primeiro e o último controle; os dois

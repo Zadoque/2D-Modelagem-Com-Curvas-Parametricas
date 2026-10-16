@@ -3,7 +3,7 @@
 
 #include "../pontos.h"
 #include "../aabb.h"
-#include "ultis/ultis.h"
+#include "utils.h"
 /**
  * Curva Catmull-Rom
  * Cada trecho definido por quatro controles interpola os dois controles

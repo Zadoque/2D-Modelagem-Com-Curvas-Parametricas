@@ -18,6 +18,7 @@ typedef struct {
   int warmup;
   float rigidez;
   int posicao_densidade;
+  int quantidade_controles;
   int anti_autointerferencia;
   float raio_arrasto;
   uint32_t semente;
@@ -30,6 +31,8 @@ typedef struct {
   int amostras;
   int insercoes;
   int remocoes;
+  double soma_insercao_ms;
+  double soma_remocao_ms;
 } ResultadoBenchmarkPainel;
 
 enum { BENCH_CURVAS = 4, BENCH_TESTES = 5 };

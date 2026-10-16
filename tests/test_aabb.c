@@ -1,5 +1,5 @@
 #include "aabb.h"
-#include "curvas/ultis/ultis.h"
+#include "curvas/utils.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>

@@ -1,4 +1,4 @@
-#include "../includes/transformacoes.h"
+#include "transformacoes.h"
 #include <math.h>
 
 #define FATOR_CISALHAMENTO_MAXIMO 10.0f

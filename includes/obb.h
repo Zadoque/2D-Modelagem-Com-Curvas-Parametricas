@@ -50,8 +50,8 @@ typedef struct {
 
 void obb_arvore_init(OBBArvore *arvore);
 void obb_arvore_liberar(OBBArvore *arvore);
-/* Orientação: covariância de cinco amostras de Rivera. Extents: casco convexo
- * dos controles locais, para conter conservadoramente todo o span. */
+/* Orientação calculada a partir de cinco pontos da curva; as extensões são
+ * ajustadas com uma amostragem adicional da própria curva para conter o span. */
 int obb_bspline_elementar(const BSplineTopologia *spline, int segmento, OBB *resultado,
                           float *comprimento);
 int obb_arvore_construir_bspline(OBBArvore *arvore, const BSplineTopologia *spline);

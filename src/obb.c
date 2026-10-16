@@ -1,4 +1,4 @@
-#include "../includes/obb.h"
+#include "obb.h"
 
 #include <float.h>
 #include <limits.h>
@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #define OBB_AMOSTRAS 5
+#define OBB_AMOSTRAS_ENCERRAMENTO 101
 #define OBB_EPSILON 1e-8f
 #define OBB_EPSILON_PARAMETRICO 1e-5f
 
@@ -73,28 +74,6 @@ static int contar_spans(const BSplineTopologia *spline){
   return quantidade;
 }
 
-/* Em um span de B-spline, os pesos locais são não negativos e somam um.
- * Logo, a curva inteira está no casco convexo destes grau + 1 controles. */
-static int controles_do_span(const BSplineTopologia *spline, int segmento, ponto controles[4]){
-  float inicio, fim;
-  int indice_no;
-  if(!spline || spline->grau > 3 ||
-     bspline_topologia_obter_span(spline, segmento, &inicio, &fim, &indice_no) != 0){
-    return -1;
-  }
-  for(unsigned j = 0; j <= spline->grau; j++){
-    int indice = indice_no - (int)spline->grau + (int)j;
-    if(spline->fechado){
-      int quantidade = spline->controles.quantidade_atual;
-      indice %= quantidade;
-      if(indice < 0){ indice += quantidade; }
-    }
-    if(indice < 0 || indice >= spline->controles.quantidade_atual){ return -1; }
-    controles[j] = spline->controles.data[indice];
-  }
-  return 0;
-}
-
 int obb_bspline_elementar(const BSplineTopologia *spline, int segmento, OBB *resultado,
                           float *comprimento){
   if(!spline || !resultado || segmento < 0){
@@ -107,7 +86,9 @@ int obb_bspline_elementar(const BSplineTopologia *spline, int segmento, OBB *res
   ponto amostras[OBB_AMOSTRAS];
   ponto media = {{0.0f, 0.0f, 1.0f}};
   for(int i = 0; i < OBB_AMOSTRAS; i++){
-    float t = 0.1f + 0.2f * (float)i;
+    /* As amostras são pontos avaliados na curva, incluindo as extremidades
+     * do span; não são pontos do vetor de controles. */
+    float t = (float)i / (float)(OBB_AMOSTRAS - 1);
     amostras[i] = bspline_topologia_avaliar(spline, inicio + (fim - inicio) * t);
     media.point[0] += amostras[i].point[0];
     media.point[1] += amostras[i].point[1];
@@ -126,12 +107,16 @@ int obb_bspline_elementar(const BSplineTopologia *spline, int segmento, OBB *res
   caixa.segmento_indice = segmento;
   eixos_covariancia(xx / (float)(OBB_AMOSTRAS - 1), xy / (float)(OBB_AMOSTRAS - 1),
                      yy / (float)(OBB_AMOSTRAS - 1), caixa.eixo);
-  ajustar(&caixa, amostras, OBB_AMOSTRAS);
-  ponto controles[4];
-  if(controles_do_span(spline, segmento, controles) != 0){ return -1; }
-  /* Mantém a orientação de Rivera, mas amplia o ajuste ao casco convexo
-   * local. Isso transforma a folha em uma caixa conservadora da B-spline. */
-  ajustar(&caixa, controles, (int)spline->grau + 1);
+  /* A orientação usa as cinco amostras principais. Para que a folha
+   * continue envolvendo o span inteiro, as extensões são ajustadas com
+   * pontos adicionais avaliados na própria curva, nunca com os controles. */
+  ponto amostras_encerramento[OBB_AMOSTRAS_ENCERRAMENTO];
+  for(int i = 0; i < OBB_AMOSTRAS_ENCERRAMENTO; i++){
+    float t = (float)i / (float)(OBB_AMOSTRAS_ENCERRAMENTO - 1);
+    amostras_encerramento[i] =
+        bspline_topologia_avaliar(spline, inicio + (fim - inicio) * t);
+  }
+  ajustar(&caixa, amostras_encerramento, OBB_AMOSTRAS_ENCERRAMENTO);
   if(comprimento){
     *comprimento = 0.0f;
     ponto anterior = bspline_topologia_avaliar(spline, inicio);
@@ -401,9 +386,45 @@ typedef struct {
   int capacidade;
 } AmostrasCurva;
 
+typedef struct {
+  AmostrasCurva *por_span;
+  int quantidade;
+} CacheAmostrasCurva;
+
+static int amostrar_span(const BSplineTopologia *spline, int segmento, float tolerancia,
+                         AmostrasCurva *amostras);
+
 static void amostras_liberar(AmostrasCurva *amostras){
   free(amostras->dados);
   *amostras = (AmostrasCurva){0};
+}
+
+static int cache_amostras_inicializar(CacheAmostrasCurva *cache, int quantidade){
+  if(!cache || quantidade <= 0){ return -1; }
+  cache->por_span = calloc((size_t)quantidade, sizeof(*cache->por_span));
+  if(!cache->por_span){ return -1; }
+  cache->quantidade = quantidade;
+  return 0;
+}
+
+static void cache_amostras_liberar(CacheAmostrasCurva *cache){
+  if(!cache){ return; }
+  for(int i = 0; i < cache->quantidade; i++){
+    amostras_liberar(&cache->por_span[i]);
+  }
+  free(cache->por_span);
+  *cache = (CacheAmostrasCurva){0};
+}
+
+static AmostrasCurva *cache_amostras_obter(const BSplineTopologia *spline,
+                                           int segmento, float tolerancia,
+                                           CacheAmostrasCurva *cache){
+  if(!cache || segmento < 0 || segmento >= cache->quantidade){ return NULL; }
+  AmostrasCurva *amostras = &cache->por_span[segmento];
+  if(amostras->dados == NULL && amostrar_span(spline, segmento, tolerancia, amostras) != 0){
+    return NULL;
+  }
+  return amostras;
 }
 
 static int amostras_adicionar(AmostrasCurva *amostras, ponto ponto_atual, float u){
@@ -512,8 +533,8 @@ static int intersectar_segmentos(ponto a, ponto b, ponto c, ponto d, float toler
   return 1;
 }
 
-static int contato_e_juncao(const BSplineTopologia *spline, int a, int b, float u_a, float u_b){
-  int spans = contar_spans(spline);
+static int contato_e_juncao(const BSplineTopologia *spline, int spans,
+                            int a, int b, float u_a, float u_b){
   int adjacentes = abs(a - b) == 1 || (spline->fechado && abs(a - b) == spans - 1);
   if(!adjacentes){ return 0; }
   int anterior = a;
@@ -535,27 +556,26 @@ static int contato_e_juncao(const BSplineTopologia *spline, int a, int b, float 
          fabsf(parametro_posterior - inicio_posterior) <= OBB_EPSILON_PARAMETRICO * escala_b;
 }
 
-static int confirmar_par(const BSplineTopologia *spline, int segmento_a, int segmento_b,
+static int confirmar_par(const BSplineTopologia *spline, int spans,
+                         CacheAmostrasCurva *cache, int segmento_a, int segmento_b,
                          float tolerancia, InterseccaoBSpline *resultado){
-  AmostrasCurva a = {0}, b = {0};
+  AmostrasCurva *a = cache_amostras_obter(spline, segmento_a, tolerancia, cache);
+  AmostrasCurva *b = cache_amostras_obter(spline, segmento_b, tolerancia, cache);
+  if(!a || !b){ return -1; }
   int encontrado = 0;
-  if(amostrar_span(spline, segmento_a, tolerancia, &a) != 0 ||
-     amostrar_span(spline, segmento_b, tolerancia, &b) != 0){
-    amostras_liberar(&a); amostras_liberar(&b); return -1;
-  }
-  for(int i = 1; i < a.quantidade && !encontrado; i++){
-    for(int j = 1; j < b.quantidade; j++){
+  for(int i = 1; i < a->quantidade && !encontrado; i++){
+    for(int j = 1; j < b->quantidade; j++){
       float ta, tb;
       ponto contato;
       int tipo;
-      if(!intersectar_segmentos(a.dados[i - 1].ponto, a.dados[i].ponto,
-                                b.dados[j - 1].ponto, b.dados[j].ponto, tolerancia,
+      if(!intersectar_segmentos(a->dados[i - 1].ponto, a->dados[i].ponto,
+                                b->dados[j - 1].ponto, b->dados[j].ponto, tolerancia,
                                 &ta, &tb, &contato, &tipo)){
         continue;
       }
-      float u_a = a.dados[i - 1].u + (a.dados[i].u - a.dados[i - 1].u) * ta;
-      float u_b = b.dados[j - 1].u + (b.dados[j].u - b.dados[j - 1].u) * tb;
-      if(contato_e_juncao(spline, segmento_a, segmento_b, u_a, u_b)){
+      float u_a = a->dados[i - 1].u + (a->dados[i].u - a->dados[i - 1].u) * ta;
+      float u_b = b->dados[j - 1].u + (b->dados[j].u - b->dados[j - 1].u) * tb;
+      if(contato_e_juncao(spline, spans, segmento_a, segmento_b, u_a, u_b)){
         continue;
       }
       *resultado = (InterseccaoBSpline){.tipo = tipo,
@@ -568,31 +588,37 @@ static int confirmar_par(const BSplineTopologia *spline, int segmento_a, int seg
       break;
     }
   }
-  amostras_liberar(&a);
-  amostras_liberar(&b);
   return encontrado;
 }
 
 int obb_bspline_autointerseccoes(const OBBArvore *arvore, const BSplineTopologia *spline,
                                  float tolerancia, InterseccaoBSpline *resultado, int capacidade){
   if(!arvore || !spline || tolerancia <= 0.0f || capacidade < 0){ return -1; }
+  int spans = contar_spans(spline);
+  if(spans <= 0){ return -1; }
   int candidatos_total = obb_arvore_candidatos_autointerferencia(arvore, NULL, 0);
   if(candidatos_total <= 0){ return candidatos_total; }
   OBBCandidato *candidatos = malloc((size_t)candidatos_total * sizeof(*candidatos));
   if(!candidatos){ return -1; }
   candidatos_total = obb_arvore_candidatos_autointerferencia(arvore, candidatos, candidatos_total);
   if(candidatos_total < 0){ free(candidatos); return -1; }
+  CacheAmostrasCurva cache = {0};
+  if(cache_amostras_inicializar(&cache, spans) != 0){
+    free(candidatos);
+    return -1;
+  }
   int quantidade = 0;
   for(int i = 0; i < candidatos_total; i++){
     InterseccaoBSpline contato;
-    int confirmado = confirmar_par(spline, candidatos[i].segmento_a, candidatos[i].segmento_b,
-                                   tolerancia, &contato);
-    if(confirmado < 0){ free(candidatos); return -1; }
+    int confirmado = confirmar_par(spline, spans, &cache, candidatos[i].segmento_a,
+                                   candidatos[i].segmento_b, tolerancia, &contato);
+    if(confirmado < 0){ cache_amostras_liberar(&cache); free(candidatos); return -1; }
     if(confirmado){
       if(quantidade < capacidade && resultado){ resultado[quantidade] = contato; }
       quantidade++;
     }
   }
+  cache_amostras_liberar(&cache);
   free(candidatos);
   return quantidade;
 }
@@ -636,16 +662,23 @@ int obb_bspline_autointerseccoes_locais(const OBBArvore *arvore,
   free(unicos);
 
   int quantidade = 0;
+  int spans = arvore->quantidade_folhas;
+  CacheAmostrasCurva cache = {0};
+  if(cache_amostras_inicializar(&cache, spans) != 0){
+    free(candidatos);
+    return -1;
+  }
   for(int i = 0; i < coleta.quantidade; i++){
     InterseccaoBSpline contato;
-    int confirmado = confirmar_par(spline, candidatos[i].segmento_a, candidatos[i].segmento_b,
-                                   tolerancia, &contato);
-    if(confirmado < 0){ free(candidatos); return -1; }
+    int confirmado = confirmar_par(spline, spans, &cache, candidatos[i].segmento_a,
+                                   candidatos[i].segmento_b, tolerancia, &contato);
+    if(confirmado < 0){ cache_amostras_liberar(&cache); free(candidatos); return -1; }
     if(confirmado){
       if(quantidade < capacidade && resultado){ resultado[quantidade] = contato; }
       quantidade++;
     }
   }
+  cache_amostras_liberar(&cache);
   free(candidatos);
   return quantidade;
 }

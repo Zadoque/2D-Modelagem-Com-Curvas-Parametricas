@@ -1,4 +1,4 @@
-#include "../includes/slider.h"
+#include "slider.h"
 
 static float limitar(float valor){
   if(valor < 0.0f){

@@ -25,6 +25,13 @@ typedef struct {
   float t_local;
 } ReferenciaArrastoBSpline;
 
+typedef struct {
+  int insercoes;
+  int remocoes;
+  double tempo_insercao_ms;
+  double tempo_remocao_ms;
+} EstatisticasArrastoBSpline;
+
 /* Cria a B-spline cardinal uniforme usada pelo modelo legado de controles. */
 int bspline_topologia_inicializar_uniforme_aberta(BSplineTopologia *spline,
                                                    const Pontos *controles, unsigned grau);
@@ -36,6 +43,11 @@ ponto bspline_topologia_avaliar(const BSplineTopologia *spline, float u);
 int bspline_topologia_obter_span(const BSplineTopologia *spline, int ordinal, float *inicio,
                                  float *fim, int *indice_no);
 int bspline_topologia_arrastar(BSplineTopologia *spline, float u, ponto mouse, float rigidez);
+/* Executa o arrasto e, em seguida, ajusta somente o span arrastado. As
+ * alterações topológicas efetivamente aceitas são acumuladas em estatisticas. */
+int bspline_topologia_arrastar_com_estatisticas(BSplineTopologia *spline, float u, ponto mouse,
+                                                 float rigidez, int span_central, float limiar,
+                                                 int remover, EstatisticasArrastoBSpline *estatisticas);
 ResultadoPicking bspline_topologia_picking(const BSplineTopologia *spline, ponto mouse,
                                            float tolerancia);
 ResultadoPicking bspline_topologia_picking_arvore(const BSplineTopologia *spline,
@@ -43,8 +55,14 @@ ResultadoPicking bspline_topologia_picking_arvore(const BSplineTopologia *spline
                                                    float tolerancia);
 int bspline_topologia_candidatos_insercao(const BSplineTopologia *spline, int span_central,
                                           float limiar, float *nos, int capacidade);
+int bspline_topologia_candidatos_insercao_todos(const BSplineTopologia *spline,
+                                                float limiar, float *nos, int capacidade);
 int bspline_topologia_candidatos_remocao(const BSplineTopologia *spline, int span_central,
                                          float limiar, float *nos, int capacidade);
+/* Variante global: percorre todos os spans e calcula cada distância entre
+ * controles consecutivos uma única vez. */
+int bspline_topologia_candidatos_remocao_todos(const BSplineTopologia *spline,
+                                               float limiar, float *nos, int capacidade);
 int bspline_topologia_remapear_parametro(const BSplineTopologia *spline, float u, int *span,
                                          float *t_local);
 int bspline_topologia_capturar_referencia_arrasto(const BSplineTopologia *spline, float u,

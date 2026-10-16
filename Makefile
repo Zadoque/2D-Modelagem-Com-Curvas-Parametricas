@@ -4,16 +4,19 @@ VERSION := $(shell tr -d '\n' < VERSION)
 CPPFLAGS ?= -Iincludes
 CPPFLAGS += -DPROJECT_VERSION=\"$(VERSION)\"
 CFLAGS ?= -O2 -g
-CFLAGS += -std=c99 -Wall -Wextra -Wpedantic
+CFLAGS += -std=c99 -Wall -Wextra -Wpedantic -MMD -MP
 LDLIBS := -lGL -lGLU -lglut -lm
 
 TARGET := bin/curvas-parametricas-2d
 SOURCES := $(shell find src -name '*.c' -print | sort)
 OBJECTS := $(patsubst src/%.c,obj/%.o,$(SOURCES))
+DEPENDS := $(OBJECTS:.o=.d)
 
 .PHONY: all run test benchmark format clean install uninstall
 
 all: $(TARGET)
+
+-include $(DEPENDS)
 
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(@D)

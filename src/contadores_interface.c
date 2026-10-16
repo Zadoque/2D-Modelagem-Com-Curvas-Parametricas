@@ -1,4 +1,4 @@
-#include "../includes/contadores_interface.h"
+#include "contadores_interface.h"
 
 #include <stdio.h>
 

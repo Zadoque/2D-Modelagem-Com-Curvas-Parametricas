@@ -1,4 +1,4 @@
-#include "../includes/densidade.h"
+#include "densidade.h"
 
 /* Posição 1 é a menor densidade e posição 5 a maior. */
 static const float limiares[DENSIDADE_POSICOES] = {230.0f, 210.0f, 190.0f, 170.0f, 150.0f};
