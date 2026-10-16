@@ -7,3 +7,6 @@
 # Recomendado: ignorar pastas de compilação também
 **/obj/
 **/obj/**
+# Artefatos gerados pelo script de build para Windows/Git Bash.
+build-windows/
+build-windows__*
